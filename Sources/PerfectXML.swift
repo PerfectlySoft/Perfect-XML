@@ -19,8 +19,213 @@
 
 import libxml2
 
-public class XMLNode: CustomStringConvertible {
+private func toNodePtr<T>(_ p: T) -> xmlNodePtr {
+	return unsafeBitCast(p, to: UnsafeMutablePointer<xmlNode>.self)
+}
+
+private func fromNodePtr<T>(_ nodePtr: xmlNodePtr) -> UnsafeMutablePointer<T> {
+	return unsafeBitCast(nodePtr, to: UnsafeMutablePointer<T>.self)
+}
+
+private typealias ForEachFunc = (node: xmlNodePtr) -> Bool
+private func forEach(node: xmlNodePtr, childrenOnly: Bool, continueFunc: ForEachFunc) -> Bool {
+	if !childrenOnly && !continueFunc(node: node) {
+		return false
+	}
+	var c = node.pointee.children
+	while let cnode = c {
+		guard forEach(node: cnode, childrenOnly: false, continueFunc: continueFunc) else {
+			return false
+		}
+		c = cnode.pointee.next
+	}
+	return true
+}
+
+public enum XNodeType {
+	case elementNode, attributeNode, textNode, cDataSection, entityReferenceNode
+	case entityNode, processingInstruction, commentNode, documentNode, documentTypeNode
+	case documentFragmentNode, notationNode
+	case unknownNodeType
+}
+
+public class XNode: CustomStringConvertible {
+	
 	private let nodePtr: xmlNodePtr
+	
+	public var nodeName: String {
+		return String(validatingUTF8: UnsafePointer(nodePtr.pointee.name)) ?? ""
+	}
+	
+	public var nodeValue: String? {
+		guard let content = xmlNodeGetContent(nodePtr) else {
+			return nil
+		}
+		defer {
+			xmlFree(content)
+		}
+		return String(validatingUTF8: UnsafeMutablePointer(content))
+	}
+	
+	public var nodeType: XNodeType {
+		switch nodePtr.pointee.type {
+		case XML_ELEMENT_NODE: return .elementNode
+		case XML_ATTRIBUTE_NODE: return .attributeNode
+		case XML_TEXT_NODE: return .textNode
+		case XML_CDATA_SECTION_NODE: return .cDataSection
+		case XML_ENTITY_REF_NODE: return .entityReferenceNode
+		case XML_ENTITY_NODE: return .entityNode
+		case XML_PI_NODE: return .processingInstruction
+		case XML_COMMENT_NODE: return .commentNode
+		case XML_DOCUMENT_NODE: return .documentNode
+		case XML_DOCUMENT_TYPE_NODE: return .documentTypeNode
+		case XML_DOCUMENT_FRAG_NODE: return .documentFragmentNode
+		case XML_NOTATION_NODE: return .notationNode
+		default: return .unknownNodeType
+//			XML_HTML_DOCUMENT_NODE = 13
+//			XML_DTD_NODE = 14
+//			XML_ELEMENT_DECL = 15
+//			XML_ATTRIBUTE_DECL = 16
+//			XML_ENTITY_DECL = 17
+//			XML_NAMESPACE_DECL = 18
+//			XML_XINCLUDE_START = 19
+//			XML_XINCLUDE_END = 20
+//			XML_DOCB_DOCUMENT_NODE
+		}
+	}
+	
+	public var parentNode: XNode? {
+		guard let parentNode = nodePtr.pointee.parent else {
+			return nil
+		}
+		return asConcreteNode(parentNode)
+	}
+	
+	public var childNodes: [XNode] {
+		var c = nodePtr.pointee.children
+		var ary = [XNode]()
+		while let child = c {
+			let concrete = asConcreteNode(child)
+			ary.append(concrete)
+			c = c?.pointee.next
+		}
+		return ary
+	}
+	
+	public var firstChild: XNode? {
+		guard let child = nodePtr.pointee.children else {
+			return nil
+		}
+		return asConcreteNode(child)
+	}
+	
+	public var lastChild: XNode? {
+		guard let child = xmlGetLastChild(nodePtr) else {
+			return nil
+		}
+		return asConcreteNode(child)
+	}
+	
+	public var previousSibling: XNode? {
+		guard let sib = nodePtr.pointee.prev else {
+			return nil
+		}
+		return asConcreteNode(sib)
+	}
+	
+	public var nextSibling: XNode? {
+		guard let sib = nodePtr.pointee.next else {
+			return nil
+		}
+		return asConcreteNode(sib)
+	}
+	
+	public var ownerDocument: XDocument?
+	
+	public var attributes: XNamedNodeMap? {
+		guard case .elementNode = nodeType else {
+			return nil
+		}
+		return XNamedNodeMapAttr(node: self)
+	}
+	
+	public var namespaceURI: String? {
+		guard let ns = nodePtr.pointee.ns else {
+			return nil
+		}
+		guard let chars = ns.pointee.href else {
+			return nil
+		}
+		return String(validatingUTF8: UnsafePointer(chars))
+	}
+	
+	public var prefix: String? {
+		guard let ns = nodePtr.pointee.ns else {
+			return nil
+		}
+		guard let chars = ns.pointee.prefix else {
+			return nil
+		}
+		return String(validatingUTF8: UnsafePointer(chars))
+	}
+	
+	public var localName: String? {
+		guard let name = nodePtr.pointee.name else {
+			return nil
+		}
+		var prefix = UnsafeMutablePointer<xmlChar>(nil)
+		guard let localPart = xmlSplitQName2(name, &prefix) else {
+			return nodeName
+		}
+		defer {
+			xmlFree(localPart)
+			if nil != prefix {
+				xmlFree(prefix)
+			}
+		}
+		return String(validatingUTF8: UnsafePointer(localPart))
+	}
+	
+	init(_ node: xmlNodePtr, document: XDocument?) {
+		self.nodePtr = node
+		self.ownerDocument = document
+	}
+	
+	deinit {
+		if nodePtr.pointee.type == XML_DOCUMENT_NODE {
+			xmlFreeDoc(nodePtr.pointee.doc)
+		}
+	}
+	
+	private func asConcreteNode(_ ptr: xmlNodePtr) -> XNode {
+		switch ptr.pointee.type {
+		case XML_ELEMENT_NODE: return XElement(fromNodePtr(ptr), document: self.ownerDocument)
+		case XML_ATTRIBUTE_NODE: return XAttr(fromNodePtr(ptr), document: self.ownerDocument)
+		case XML_TEXT_NODE: return XText(ptr, document: self.ownerDocument)
+		case XML_CDATA_SECTION_NODE: return XCData(ptr, document: self.ownerDocument)
+//		case XML_ENTITY_REF_NODE:
+//		case XML_ENTITY_NODE:
+//		case XML_PI_NODE:
+		case XML_COMMENT_NODE: return XComment(ptr, document: self.ownerDocument)
+//		case XML_DOCUMENT_NODE:
+//		case XML_DOCUMENT_TYPE_NODE:
+//		case XML_DOCUMENT_FRAG_NODE:
+//		case XML_NOTATION_NODE:
+//		case XML_HTML_DOCUMENT_NODE:
+//		case XML_DTD_NODE:
+//		case XML_ELEMENT_DECL:
+//		case XML_ATTRIBUTE_DECL:
+//		case XML_ENTITY_DECL:
+//		case XML_NAMESPACE_DECL:
+//		case XML_XINCLUDE_START:
+//		case XML_XINCLUDE_END:
+//		case XML_DOCB_DOCUMENT_NODE:
+		default: ()
+			print("Unhandled node type \(ptr.pointee.type)")
+			return XNode(ptr, document: self.ownerDocument)
+		}
+	}
+	
 	public func string(pretty: Bool = false) -> String {
 		let buff = xmlBufferCreate()
 		defer { xmlBufferFree(buff) }
@@ -31,45 +236,320 @@ public class XMLNode: CustomStringConvertible {
 		}
 		return String(validatingUTF8: UnsafeMutablePointer(content)) ?? ""
 	}
+	
 	public var description: String {
 		return self.string()
 	}
-	
-	public var childNodes: [XMLNode] {
-		var c = nodePtr.pointee.children
-		var ary = [XMLNode]()
-		while let child = c {
-			ary.append(XMLNode(child))
-			c = c?.pointee.next
-		}
-		return ary
-	}
-	
-	init(_ node: xmlNodePtr) {
-		self.nodePtr = node
-	}
-	
-	deinit {
-		if nodePtr.pointee.type == XML_DOCUMENT_NODE {
-			xmlFreeDoc(nodePtr.pointee.doc)
-		}
-	}
 }
 
-public class XMLDocument: XMLNode {
+public class XDocument: XNode {
 	
 	static var initialize: Bool = {
 		xmlInitParser()
 		return true
 	}()
 	
+	override public var nodeName: String {
+		return "#document"
+	}
+	
+	public var documentElement: XElement? {
+		guard let e = xmlDocGetRootElement(fromNodePtr(nodePtr)) else {
+			return nil
+		}
+		return XElement(fromNodePtr(e), document: self)
+	}
+	
 	public init?(fromSource: String) {
-		_ = XMLDocument.initialize
+		_ = XDocument.initialize
 		guard let doc = xmlParseDoc(fromSource) else {
 			return nil
 		}
-		super.init(unsafeBitCast(doc, to: UnsafeMutablePointer<xmlNode>.self))
+		super.init(toNodePtr(doc), document: nil)
+	}
+	
+	public init(_ ptr: xmlDocPtr) {
+		super.init(toNodePtr(ptr), document: nil)
+	}
+	
+	public func getElementsByTagName(_ name: String) -> [XElement] {
+		guard let element = documentElement else {
+			return [XElement]()
+		}
+		return element.getElementsByTagName(name, childrenOnly: false)
+	}
+	
+	public func getElementsByTagNameNS(namespaceURI: String, localName: String) -> [XElement] {
+		guard let element = documentElement else {
+			return [XElement]()
+		}
+		return element.getElementsByTagNameNS(namespaceURI: namespaceURI, localName: localName, childrenOnly: false)
+	}
+	
+	public func getElementById(_ elementId: String) -> XElement? {
+		guard let element = documentElement else {
+			return nil
+		}
+		return element.getElementById(elementId, childrenOnly: false)
 	}
 }
+
+public class XElement: XNode {
+	
+	public var tagName: String {
+		return nodeName
+	}
+	
+	init(_ node: xmlElementPtr, document: XDocument?) {
+		super.init(toNodePtr(node), document: document)
+	}
+	
+	public func getAttribute(name: String) -> String? {
+		guard let node = getAttributeNode(name: name) else {
+			return nil
+		}
+		return node.value
+	}
+	
+	public func getAttributeNode(name: String) -> XAttr? {
+		var n = nodePtr.pointee.properties
+		while let attr = n {
+			if String(validatingUTF8: UnsafePointer(attr.pointee.name)) == name {
+				return asConcreteNode(UnsafeMutablePointer(attr)) as? XAttr
+			}
+			n = n?.pointee.next
+		}
+		return nil
+	}
+	
+	public func getAttributeNodeNS(namespaceURI: String, localName: String) -> XAttr? {
+		var n = nodePtr.pointee.properties
+		while let attr = n {
+			defer {
+				n = n?.pointee.next
+			}
+			guard let cname = attr.pointee.name else {
+				continue
+			}
+			guard let ns = attr.pointee.ns else {
+				continue
+			}
+			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)),
+				nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
+					continue
+			}
+			
+			if nameTest == localName && nsNameTest == namespaceURI {
+				return asConcreteNode(UnsafeMutablePointer(attr)) as? XAttr
+			}
+		}
+		return nil
+	}
+	
+	public func hasAttribute(name: String) -> Bool {
+		return nil != getAttributeNode(name: name)
+	}
+	
+	public func hasAttributeNS(namespaceURI: String, localName: String) -> Bool {
+		return nil != getAttributeNodeNS(namespaceURI: namespaceURI, localName: localName)
+	}
+	
+	public func getElementsByTagName(_ name: String) -> [XElement] {
+		return getElementsByTagName(name, childrenOnly: true)
+	}
+	
+	public func getElementsByTagNameNS(namespaceURI: String, localName: String) -> [XElement] {
+		return getElementsByTagNameNS(namespaceURI: namespaceURI, localName: localName, childrenOnly: true)
+	}
+	
+	public func getElementById(_ elementId: String) -> XElement? {
+		return getElementById(elementId, childrenOnly: true)
+	}
+	
+	func getElementsByTagNameNS(namespaceURI: String, localName: String, childrenOnly: Bool) -> [XElement] {
+		var ret = [XElement]()
+		_ = forEach(node: nodePtr, childrenOnly: childrenOnly) {
+			node in
+			
+			guard localName == "*" || String(validatingUTF8: UnsafePointer(node.pointee.name)) == localName else {
+				return true
+			}
+			guard let ns = node.pointee.ns else {
+				return true
+			}
+			guard let chars = ns.pointee.href else {
+				return true
+			}
+			guard namespaceURI == "*" || String(validatingUTF8: UnsafePointer(chars)) == namespaceURI else {
+				return true
+			}
+			guard let element = self.asConcreteNode(node) as? XElement else {
+				return true
+			}
+			ret.append(element)
+			return true
+		}
+		return ret
+	}
+	
+	func getElementById(_ elementId: String, childrenOnly: Bool) -> XElement? {
+		var ret: XElement?
+		_ = forEach(node: nodePtr, childrenOnly: childrenOnly) {
+			node in
+			guard node.pointee.type == XML_ELEMENT_NODE else {
+				return true
+			}
+			let element = XElement(fromNodePtr(node), document: self.ownerDocument)
+			guard let attrVal = element.getAttribute(name: "id") else {
+				return true
+			}
+			if attrVal == elementId {
+				ret = element
+			}
+			return nil == ret
+		}
+		return ret
+	}
+	
+	func getElementsByTagName(_ name: String, childrenOnly: Bool) -> [XElement] {
+		var ret = [XElement]()
+		_ = forEach(node: nodePtr, childrenOnly: childrenOnly) {
+			node in
+			guard name == "*" || String(validatingUTF8: UnsafePointer(node.pointee.name)) == name else {
+				return true
+			}
+			guard let element = self.asConcreteNode(node) as? XElement else {
+				return true
+			}
+			ret.append(element)
+			return true
+		}
+		return ret
+	}
+}
+
+public class XAttr: XNode {
+	
+	public var name: String {
+		return nodeName
+	}
+	
+	public var value: String {
+		return nodeValue ?? ""
+	}
+	
+	public var ownerElement: XElement? {
+		return parentNode as? XElement
+	}
+	
+	init(_ node: xmlAttrPtr, document: XDocument?) {
+		super.init(toNodePtr(node), document: document)
+	}
+}
+
+public class XText: XNode {
+	override public var nodeName: String {
+		return "#text"
+	}
+}
+
+public class XCData: XText {
+	override public var nodeName: String {
+		return "#cdata-section"
+	}
+}
+
+public class XComment: XText {
+	override public var nodeName: String {
+		return "#comment"
+	}
+}
+
+public protocol XNamedNodeMap {
+	var length: Int { get }
+	func getNamedItem(name: String) -> XNode?
+	func getNamedItemNS(namespaceURI: String, localName: String) -> XNode?
+	func item(index: Int) -> XNode?
+}
+
+public extension XNamedNodeMap {
+	subscript(index: Int) -> XNode? {
+		return item(index: index)
+	}
+	subscript(name: String) -> XNode? {
+		return getNamedItem(name: name)
+	}
+}
+
+struct XNamedNodeMapAttr: XNamedNodeMap {
+	let node: XNode
+	
+	var length: Int {
+		var c = 0
+		var n = node.nodePtr.pointee.properties
+		while let _ = n {
+			c += 1
+			n = n?.pointee.next
+		}
+		return c
+	}
+	
+	func getNamedItem(name: String) -> XNode? {
+		var n = node.nodePtr.pointee.properties
+		while let attr = n {
+			defer {
+				n = n?.pointee.next
+			}
+			guard let cname = attr.pointee.name else {
+				continue
+			}
+			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)) else {
+				continue
+			}
+			if nameTest == name {
+				return node.asConcreteNode(UnsafeMutablePointer(attr))
+			}
+		}
+		return nil
+	}
+	
+	func getNamedItemNS(namespaceURI: String, localName: String) -> XNode? {
+		var n = node.nodePtr.pointee.properties
+		while let attr = n {
+			defer {
+				n = n?.pointee.next
+			}
+			guard let cname = attr.pointee.name else {
+				continue
+			}
+			guard let ns = attr.pointee.ns else {
+				continue
+			}
+			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)),
+				nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
+				continue
+			}
+			
+			if nameTest == localName && nsNameTest == namespaceURI {
+				return node.asConcreteNode(UnsafeMutablePointer(attr))
+			}
+		}
+		return nil
+	}
+	
+	func item(index: Int) -> XNode? {
+		var c = index
+		var n = node.nodePtr.pointee.properties
+		while let attr = n {
+			if c == 0 {
+				return node.asConcreteNode(UnsafeMutablePointer(attr))
+			}
+			c -= 1
+			n = n?.pointee.next
+		}
+		return nil
+	}
+}
+
 
 
