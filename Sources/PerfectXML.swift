@@ -19,11 +19,11 @@
 
 import libxml2
 
-private func toNodePtr<T>(_ p: T) -> xmlNodePtr {
+func toNodePtr<T>(_ p: T) -> xmlNodePtr {
 	return unsafeBitCast(p, to: UnsafeMutablePointer<xmlNode>.self)
 }
 
-private func fromNodePtr<T>(_ nodePtr: xmlNodePtr) -> UnsafeMutablePointer<T> {
+func fromNodePtr<T>(_ nodePtr: xmlNodePtr) -> UnsafeMutablePointer<T> {
 	return unsafeBitCast(nodePtr, to: UnsafeMutablePointer<T>.self)
 }
 
@@ -51,7 +51,7 @@ public enum XNodeType {
 
 public class XNode: CustomStringConvertible {
 	
-	private let nodePtr: xmlNodePtr
+	let nodePtr: xmlNodePtr
 	
 	public var nodeName: String {
 		return String(validatingUTF8: UnsafePointer(nodePtr.pointee.name)) ?? ""
@@ -197,7 +197,7 @@ public class XNode: CustomStringConvertible {
 		}
 	}
 	
-	private func asConcreteNode(_ ptr: xmlNodePtr) -> XNode {
+	func asConcreteNode(_ ptr: xmlNodePtr) -> XNode {
 		switch ptr.pointee.type {
 		case XML_ELEMENT_NODE: return XElement(fromNodePtr(ptr), document: self.ownerDocument)
 		case XML_ATTRIBUTE_NODE: return XAttr(fromNodePtr(ptr), document: self.ownerDocument)
@@ -246,6 +246,7 @@ public class XDocument: XNode {
 	
 	static var initialize: Bool = {
 		xmlInitParser()
+		xmlXPathInit()
 		return true
 	}()
 	

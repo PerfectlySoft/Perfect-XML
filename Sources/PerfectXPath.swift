@@ -12,8 +12,107 @@ public enum XPathException: ErrorProtocol {
 	case invalidExpression
 }
 
+public enum XPathObject {
+	case none
+	case nodeSet([XNode])
+	case boolean(Bool)
+	case number(Double)
+	case string(String)
+}
+
 public extension XNode {
-//	public func extract(path: String, namespaces: [(String, String)] = [(String, String)]()) -> [XNode] {
-//		let ctx = xmlXPathNewContext()
-//	}
+	
+	private var xPathTargetNode: xmlNodePtr {
+		if case .documentNode = self.nodeType {
+			return xmlDocGetRootElement(fromNodePtr(nodePtr))
+		}
+		return nodePtr
+	}
+	
+	private func initializeContext() -> xmlXPathContextPtr! {
+		let targetNode = xPathTargetNode
+		guard let ctx = xmlXPathNewContext(targetNode.pointee.doc) else {
+			return nil
+		}
+		ctx.pointee.node = targetNode
+		return ctx
+	}
+	
+	private func translateXPath(result: xmlXPathObjectPtr) -> XPathObject {
+		switch result.pointee.type {
+		case XPATH_BOOLEAN:
+			return .boolean(1 == xmlXPathCastToBoolean(result))
+		case XPATH_NUMBER:
+			return .number(xmlXPathCastToNumber(result))
+		case XPATH_NODESET:
+			var ary = [XNode]()
+			guard let nodeSet = result.pointee.nodesetval else {
+				return .nodeSet(ary)
+			}
+			for index in 0..<Int(nodeSet.pointee.nodeNr) {
+				let nodeTst = nodeSet.pointee.nodeTab.advanced(by: index)
+				guard let node = nodeTst.pointee else {
+					continue
+				}
+				if node.pointee.type == XML_NAMESPACE_DECL {
+					let ns: xmlNsPtr = UnsafeMutablePointer(node)
+					var element: xmlNodePtr?
+					if nil != ns.pointee.next && ns.pointee.next.pointee.type == XML_ELEMENT_NODE {
+						element = UnsafeMutablePointer(ns.pointee.next)
+					} else {
+						element = xmlDocGetRootElement(node.pointee.doc)
+					}
+					if let fnd = xmlSearchNs(node.pointee.doc, element, ns.pointee.prefix) {
+						ary.append(asConcreteNode(UnsafeMutablePointer(fnd)))
+					}
+				} else {
+					ary.append(asConcreteNode(node))
+				}
+			}
+			return .nodeSet(ary)
+		default:
+			guard let chars = xmlXPathCastToString(result) else {
+				return .none
+			}
+			defer {
+				xmlFree(chars)
+			}
+			return .string(String(validatingUTF8: UnsafePointer(chars)) ?? "")
+		}
+	}
+	
+	public func extract(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XPathObject {
+		guard let ctx = initializeContext() else {
+			return .none
+		}
+		defer {
+			xmlXPathFreeContext(ctx)
+		}
+		final class ErrorTracker {
+			var errorMsgs = [String]()
+		}
+		let errorTracker = ErrorTracker()
+		ctx.pointee.userData = Unmanaged.passRetained(errorTracker).toOpaque()
+		ctx.pointee.error = {
+			userData, error in
+			guard let userData = userData else {
+				return
+			}
+			let errorTracker: ErrorTracker = Unmanaged.fromOpaque(userData).takeRetainedValue()
+			
+			print("help")
+		}
+		
+		for (prefix, uri) in namespaces {
+			xmlXPathRegisterNs(ctx, prefix, uri)
+		}
+		
+		if let result = xmlXPathEval(path, ctx) {
+			defer {
+				xmlXPathFreeObject(result)
+			}
+			return translateXPath(result: result)
+		}
+		return .none
+	}
 }

@@ -350,6 +350,67 @@ class PerfectXMLTests: XCTestCase {
 		}
 	}
 	
+	func testXPath1() {
+		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b id=\"foo\"/><a><b>FOO<b/></b></a></a>\n"
+		guard let doc = XDocument(fromSource: docSrc) else {
+			return XCTAssert(false)
+		}
+		XCTAssert(doc.nodeName == "#document")
+		
+		let pathRes = doc.extract(path: "/a/b")
+		guard case .nodeSet(let set) = pathRes else {
+			return XCTAssert(false, "\(pathRes)")
+		}
+		for node in set {
+			guard let b = node as? XElement else {
+				return XCTAssert(false, "\(node)")
+			}
+			XCTAssert(b.tagName == "b")
+		}
+	}
+	
+	func testXPath2() {
+		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b id=\"foo\"/><a><b>FOO<b/></b></a></a>\n"
+		guard let doc = XDocument(fromSource: docSrc) else {
+			return XCTAssert(false)
+		}
+		XCTAssert(doc.nodeName == "#document")
+		
+		let pathRes = doc.extract(path: "/a/b/@id")
+		guard case .nodeSet(let set) = pathRes else {
+			return XCTAssert(false, "\(pathRes)")
+		}
+		for node in set {
+			guard let b = node as? XAttr else {
+				return XCTAssert(false, "\(node)")
+			}
+			XCTAssert(b.name == "id")
+			XCTAssert(b.value == "foo")
+		}
+	}
+	
+	func testXPath3() {
+		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b id=\"foo\"/><a><b>FOO<b/></b></a></a>\n"
+		guard let doc = XDocument(fromSource: docSrc) else {
+			return XCTAssert(false)
+		}
+		XCTAssert(doc.nodeName == "#document")
+		
+		let pathRes = doc.extract(path: "/a/a/b/text()")
+		guard case .nodeSet(let set) = pathRes else {
+			return XCTAssert(false, "\(pathRes)")
+		}
+		for node in set {
+			guard let b = node as? XText else {
+				return XCTAssert(false, "\(node)")
+			}
+			guard let nodeValue = b.nodeValue else {
+				return XCTAssert(false, "\(b)")
+			}
+			XCTAssert(nodeValue == "FOO")
+		}
+	}
+	
     static var allTests : [(String, (PerfectXMLTests) -> () throws -> Void)] {
 		return [
 			("testDocParse1", testDocParse1),
@@ -368,6 +429,9 @@ class PerfectXMLTests: XCTestCase {
 			("testDocElementByName3", testDocElementByName3),
 			("testDocElementByName4", testDocElementByName4),
 			("testDocElementById1", testDocElementById1),
+			("testXPath1", testXPath1),
+			("testXPath2", testXPath2),
+			("testXPath3", testXPath3),
 			
         ]
     }
