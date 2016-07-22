@@ -341,13 +341,6 @@ class PerfectXMLTests: XCTestCase {
 			}
 			XCTAssert(element.tagName == "b")
 		}
-		
-		do {
-			guard let element = doc?.documentElement?.getElementById("foo") else {
-				return XCTAssert(false)
-			}
-			XCTAssert(element.tagName == "b")
-		}
 	}
 	
 	func testXPath1() {
