@@ -8,6 +8,7 @@
 
 import libxml2
 
+/// An XPath result object type.
 public enum XPathObject {
 	case none
 	case nodeSet([XNode])
@@ -17,6 +18,7 @@ public enum XPathObject {
 	case invalidExpression
 }
 
+/// XPath related functions.
 public extension XNode {
 	
 	private var xPathTargetNode: xmlNodePtr {
@@ -77,7 +79,8 @@ public extension XNode {
 			return .string(String(validatingUTF8: UnsafePointer(chars)) ?? "")
 		}
 	}
-	
+	/// Execute the XPath and return the result(s).
+	/// Accepts and array of tuples holding namespace prefixes and uris.
 	public func extract(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XPathObject {
 		guard let ctx = initializeContext() else {
 			return .none
@@ -112,12 +115,12 @@ public extension XNode {
 		}
 		return .none
 	}
-	
+	/// Execute the XPath and return a single resul tnode or nil.
+	/// Accepts and array of tuples holding namespace prefixes and uris.
 	public func extractOne(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XNode? {
 		guard case .nodeSet(let nodes) = extract(path: path, namespaces: namespaces) else {
 			return nil
 		}
 		return nodes.first
 	}
-	
 }
