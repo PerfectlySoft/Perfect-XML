@@ -8,16 +8,13 @@
 
 import libxml2
 
-public enum XPathException: ErrorProtocol {
-	case invalidExpression
-}
-
 public enum XPathObject {
 	case none
 	case nodeSet([XNode])
 	case boolean(Bool)
 	case number(Double)
 	case string(String)
+	case invalidExpression
 }
 
 public extension XNode {
@@ -115,4 +112,12 @@ public extension XNode {
 		}
 		return .none
 	}
+	
+	public func extractOne(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XNode? {
+		guard case .nodeSet(let nodes) = extract(path: path, namespaces: namespaces) else {
+			return nil
+		}
+		return nodes.first
+	}
+	
 }

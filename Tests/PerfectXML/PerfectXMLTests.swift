@@ -411,6 +411,24 @@ class PerfectXMLTests: XCTestCase {
 		}
 	}
 	
+	func testXPath4() {
+		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b id=\"foo\"/><a><b>FOO<b/></b></a></a>\n"
+		guard let doc = XDocument(fromSource: docSrc) else {
+			return XCTAssert(false)
+		}
+		XCTAssert(doc.nodeName == "#document")
+		guard let node = doc.extractOne(path: "/a/a/b/text()") else {
+			return XCTAssert(false, "no result")
+		}
+		guard let b = node as? XText else {
+			return XCTAssert(false, "\(node)")
+		}
+		guard let nodeValue = b.nodeValue else {
+			return XCTAssert(false, "\(b)")
+		}
+		XCTAssert(nodeValue == "FOO")
+	}
+	
     static var allTests : [(String, (PerfectXMLTests) -> () throws -> Void)] {
 		return [
 			("testDocParse1", testDocParse1),
@@ -432,6 +450,7 @@ class PerfectXMLTests: XCTestCase {
 			("testXPath1", testXPath1),
 			("testXPath2", testXPath2),
 			("testXPath3", testXPath3),
+			("testXPath4", testXPath4),
 			
         ]
     }
