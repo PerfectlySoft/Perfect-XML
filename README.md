@@ -321,8 +321,9 @@ Namespaces:
 
 ```swift
 let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a xmlns:foo=\"foo:bar\"><b/><foo:a><b>FOO<b/></b></foo:a></a>\n"
-let doc = XDocument(fromSource: docSrc)!
-	
+guard let doc = XDocument(fromSource: docSrc) else {
+	return XCTAssert(false)
+}
 let namespaces = [("f", "foo:bar")]
 let pathRes = doc.extract(path: "/a/f:a", namespaces: namespaces)
 guard case .nodeSet(let set) = pathRes else {
