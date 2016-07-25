@@ -44,7 +44,7 @@ class PerfectXMLTests: XCTestCase {
 			guard let textChild = children.first as? XText else {
 				return XCTAssert(false)
 			}
-			XCTAssert(textChild.description == value)
+			XCTAssert(textChild.nodeValue == value)
 		}
 	}
 	
@@ -77,7 +77,7 @@ class PerfectXMLTests: XCTestCase {
 		}
 		XCTAssert(children.nodeName == "a")
 		let nodeType = children.nodeType
-		if case XNodeType.elementNode = nodeType {
+		if case .elementNode = nodeType {
 		
 		} else {
 			XCTAssert(false, "\(nodeType)")
@@ -334,13 +334,10 @@ class PerfectXMLTests: XCTestCase {
 		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b id=\"foo\"/><a><b>FOO<b/></b></a></a>\n"
 		let doc = XDocument(fromSource: docSrc)
 		XCTAssert(doc?.nodeName == "#document")
-		
-		do {
-			guard let element = doc?.getElementById("foo") else {
-				return XCTAssert(false)
-			}
-			XCTAssert(element.tagName == "b")
+		guard let element = doc?.getElementById("foo") else {
+			return XCTAssert(false)
 		}
+		XCTAssert(element.tagName == "b")
 	}
 	
 	func testXPath1() {
@@ -422,6 +419,25 @@ class PerfectXMLTests: XCTestCase {
 		XCTAssert(nodeValue == "FOO")
 	}
 	
+	func testXPath5() {
+		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a xmlns:foo=\"foo:bar\"><b/><foo:a><b>FOO<b/></b></foo:a></a>\n"
+		let doc = XDocument(fromSource: docSrc)!
+		
+		let namespaces = [("f", "foo:bar")]
+		let pathRes = doc.extract(path: "/a/f:a", namespaces: namespaces)
+		guard case .nodeSet(let set) = pathRes else {
+			return XCTAssert(false, "\(pathRes)")
+		}
+		for node in set {
+			guard let e = node as? XElement else {
+				return XCTAssert(false, "\(node)")
+			}
+			XCTAssert(e.tagName == "a")
+			XCTAssert(e.namespaceURI == "foo:bar")
+			XCTAssert(e.prefix == "foo")
+		}
+	}
+	
     static var allTests : [(String, (PerfectXMLTests) -> () throws -> Void)] {
 		return [
 			("testDocParse1", testDocParse1),
@@ -444,6 +460,7 @@ class PerfectXMLTests: XCTestCase {
 			("testXPath2", testXPath2),
 			("testXPath3", testXPath3),
 			("testXPath4", testXPath4),
+			("testXPath5", testXPath5),
 			
         ]
     }
