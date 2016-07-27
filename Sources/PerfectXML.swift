@@ -352,7 +352,7 @@ public class XElement: XNode {
 				continue
 			}
 			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)),
-				nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
+				let nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
 					continue
 			}
 			
@@ -545,7 +545,7 @@ struct XNamedNodeMapAttr: XNamedNodeMap {
 				continue
 			}
 			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)),
-				nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
+				let nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
 				continue
 			}
 			
