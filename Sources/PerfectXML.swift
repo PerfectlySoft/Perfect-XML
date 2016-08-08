@@ -27,9 +27,9 @@ func fromNodePtr<T>(_ nodePtr: xmlNodePtr) -> UnsafeMutablePointer<T> {
 	return unsafeBitCast(nodePtr, to: UnsafeMutablePointer<T>.self)
 }
 
-private typealias ForEachFunc = (node: xmlNodePtr) -> Bool
+private typealias ForEachFunc = (_ node: xmlNodePtr) -> Bool
 private func forEach(node: xmlNodePtr, childrenOnly: Bool, continueFunc: ForEachFunc) -> Bool {
-	if !childrenOnly && !continueFunc(node: node) {
+	if !childrenOnly && !continueFunc(node) {
 		return false
 	}
 	var c = node.pointee.children
@@ -58,7 +58,10 @@ public class XNode: CustomStringConvertible {
 	let nodePtr: xmlNodePtr
 	/// The name of this node, depending on its type.
 	public var nodeName: String {
-		return String(validatingUTF8: UnsafePointer(nodePtr.pointee.name)) ?? ""
+		guard let name = nodePtr.pointee.name else {
+			return ""
+		}
+		return String(validatingUTF8: UnsafeRawPointer(name).assumingMemoryBound(to: Int8.self)) ?? ""
 	}
 	/// The value of this node, depending on its type. When it is defined to be null, setting it has no effect.
 	public var nodeValue: String? {
@@ -68,7 +71,7 @@ public class XNode: CustomStringConvertible {
 		defer {
 			xmlFree(content)
 		}
-		return String(validatingUTF8: UnsafeMutablePointer(content))
+		return String(validatingUTF8: UnsafeMutableRawPointer(content).assumingMemoryBound(to: Int8.self))
 	}
 	/// A code representing the type of the underlying object.
 	public var nodeType: XNodeType {
@@ -162,7 +165,7 @@ public class XNode: CustomStringConvertible {
 		guard let chars = ns.pointee.href else {
 			return nil
 		}
-		return String(validatingUTF8: UnsafePointer(chars))
+		return String(validatingUTF8: UnsafeRawPointer(chars).assumingMemoryBound(to: Int8.self))
 	}
 	/// The namespace prefix of this node, or null if it is unspecified.
 	public var prefix: String? {
@@ -172,7 +175,7 @@ public class XNode: CustomStringConvertible {
 		guard let chars = ns.pointee.prefix else {
 			return nil
 		}
-		return String(validatingUTF8: UnsafePointer(chars))
+		return String(validatingUTF8: UnsafeRawPointer(chars).assumingMemoryBound(to: Int8.self))
 	}
 	/// Returns the local part of the qualified name of this node.
 	/// For nodes of any type other than ELEMENT_NODE and ATTRIBUTE_NODE and nodes created with a DOM Level 1 method, such as createElement from the Document interface, this is always null.
@@ -180,7 +183,7 @@ public class XNode: CustomStringConvertible {
 		guard let name = nodePtr.pointee.name else {
 			return nil
 		}
-		var prefix = UnsafeMutablePointer<xmlChar>(nil)
+		var prefix = UnsafeMutablePointer<xmlChar>(nil as OpaquePointer?)
 		guard let localPart = xmlSplitQName2(name, &prefix) else {
 			return nodeName
 		}
@@ -190,7 +193,7 @@ public class XNode: CustomStringConvertible {
 				xmlFree(prefix)
 			}
 		}
-		return String(validatingUTF8: UnsafePointer(localPart))
+		return String(validatingUTF8: UnsafeRawPointer(localPart).assumingMemoryBound(to: Int8.self))
 	}
 	
 	init(_ node: xmlNodePtr, document: XDocument?) {
@@ -241,7 +244,7 @@ public class XNode: CustomStringConvertible {
 		guard let content = xmlBufferContent(buff) else {
 			return ""
 		}
-		return String(validatingUTF8: UnsafeMutablePointer(content)) ?? ""
+		return String(validatingUTF8: UnsafeRawPointer(content).assumingMemoryBound(to: Int8.self)) ?? ""
 	}
 	/// The non-pretty printed string value.
 	public var description: String {
@@ -331,8 +334,11 @@ public class XElement: XNode {
 	public func getAttributeNode(name: String) -> XAttr? {
 		var n = nodePtr.pointee.properties
 		while let attr = n {
-			if String(validatingUTF8: UnsafePointer(attr.pointee.name)) == name {
-				return asConcreteNode(UnsafeMutablePointer(attr)) as? XAttr
+			guard let namePtr = attr.pointee.name else {
+				continue
+			}
+			if String(validatingUTF8: UnsafeRawPointer(namePtr).assumingMemoryBound(to: Int8.self)) == name {
+				return asConcreteNode(UnsafeMutableRawPointer(attr).assumingMemoryBound(to: xmlNode.self)) as? XAttr
 			}
 			n = n?.pointee.next
 		}
@@ -351,13 +357,14 @@ public class XElement: XNode {
 			guard let ns = attr.pointee.ns else {
 				continue
 			}
-			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)),
-				let nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
+			guard let nameTest = String(validatingUTF8: UnsafeRawPointer(cname).assumingMemoryBound(to: Int8.self)),
+				let href = ns.pointee.href,
+				let nsNameTest = String(validatingUTF8: UnsafeRawPointer(href).assumingMemoryBound(to: Int8.self)) else {
 					continue
 			}
 			
 			if nameTest == localName && nsNameTest == namespaceURI {
-				return asConcreteNode(UnsafeMutablePointer(attr)) as? XAttr
+				return asConcreteNode(UnsafeMutableRawPointer(attr).assumingMemoryBound(to: xmlNode.self)) as? XAttr
 			}
 		}
 		return nil
@@ -384,7 +391,10 @@ public class XElement: XNode {
 		_ = forEach(node: nodePtr, childrenOnly: childrenOnly) {
 			node in
 			
-			guard localName == "*" || String(validatingUTF8: UnsafePointer(node.pointee.name)) == localName else {
+			guard let name = node.pointee.name else {
+				return true
+			}
+			guard localName == "*" || String(validatingUTF8: UnsafeRawPointer(name).assumingMemoryBound(to: Int8.self)) == localName else {
 				return true
 			}
 			guard let ns = node.pointee.ns else {
@@ -393,7 +403,7 @@ public class XElement: XNode {
 			guard let chars = ns.pointee.href else {
 				return true
 			}
-			guard namespaceURI == "*" || String(validatingUTF8: UnsafePointer(chars)) == namespaceURI else {
+			guard namespaceURI == "*" || String(validatingUTF8: UnsafeRawPointer(chars).assumingMemoryBound(to: Int8.self)) == namespaceURI else {
 				return true
 			}
 			guard let element = self.asConcreteNode(node) as? XElement else {
@@ -428,7 +438,11 @@ public class XElement: XNode {
 		var ret = [XElement]()
 		_ = forEach(node: nodePtr, childrenOnly: childrenOnly) {
 			node in
-			guard name == "*" || String(validatingUTF8: UnsafePointer(node.pointee.name)) == name else {
+			
+			guard let namePtr = node.pointee.name else {
+				return true
+			}
+			guard name == "*" || String(validatingUTF8: UnsafeRawPointer(namePtr).assumingMemoryBound(to: Int8.self)) == name else {
 				return true
 			}
 			guard let element = self.asConcreteNode(node) as? XElement else {
@@ -522,11 +536,11 @@ struct XNamedNodeMapAttr: XNamedNodeMap {
 			guard let cname = attr.pointee.name else {
 				continue
 			}
-			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)) else {
+			guard let nameTest = String(validatingUTF8: UnsafeRawPointer(cname).assumingMemoryBound(to: Int8.self)) else {
 				continue
 			}
 			if nameTest == name {
-				return node.asConcreteNode(UnsafeMutablePointer(attr))
+				return node.asConcreteNode(UnsafeMutableRawPointer(attr).assumingMemoryBound(to: xmlNode.self))
 			}
 		}
 		return nil
@@ -544,13 +558,14 @@ struct XNamedNodeMapAttr: XNamedNodeMap {
 			guard let ns = attr.pointee.ns else {
 				continue
 			}
-			guard let nameTest = String(validatingUTF8: UnsafePointer(cname)),
-				let nsNameTest = String(validatingUTF8: UnsafePointer(ns.pointee.href)) else {
+			guard let nameTest = String(validatingUTF8: UnsafeRawPointer(cname).assumingMemoryBound(to: Int8.self)),
+				let href = ns.pointee.href,
+				let nsNameTest = String(validatingUTF8: UnsafeRawPointer(href).assumingMemoryBound(to: Int8.self)) else {
 				continue
 			}
 			
 			if nameTest == localName && nsNameTest == namespaceURI {
-				return node.asConcreteNode(UnsafeMutablePointer(attr))
+				return node.asConcreteNode(UnsafeMutableRawPointer(attr).assumingMemoryBound(to: xmlNode.self))
 			}
 		}
 		return nil
@@ -561,7 +576,7 @@ struct XNamedNodeMapAttr: XNamedNodeMap {
 		var n = node.nodePtr.pointee.properties
 		while let attr = n {
 			if c == 0 {
-				return node.asConcreteNode(UnsafeMutablePointer(attr))
+				return node.asConcreteNode(UnsafeMutableRawPointer(attr).assumingMemoryBound(to: xmlNode.self))
 			}
 			c -= 1
 			n = n?.pointee.next

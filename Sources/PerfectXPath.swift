@@ -54,15 +54,15 @@ public extension XNode {
 					continue
 				}
 				if node.pointee.type == XML_NAMESPACE_DECL {
-					let ns: xmlNsPtr = UnsafeMutablePointer(node)
+					let ns: xmlNsPtr = UnsafeMutableRawPointer(node).assumingMemoryBound(to: xmlNs.self)
 					var element: xmlNodePtr?
 					if nil != ns.pointee.next && ns.pointee.next.pointee.type == XML_ELEMENT_NODE {
-						element = UnsafeMutablePointer(ns.pointee.next)
+						element = UnsafeMutableRawPointer(ns.pointee.next)?.assumingMemoryBound(to: xmlNode.self)
 					} else {
 						element = xmlDocGetRootElement(node.pointee.doc)
 					}
 					if let fnd = xmlSearchNs(node.pointee.doc, element, ns.pointee.prefix) {
-						ary.append(asConcreteNode(UnsafeMutablePointer(fnd)))
+						ary.append(asConcreteNode(UnsafeMutableRawPointer(fnd).assumingMemoryBound(to: xmlNode.self)))
 					}
 				} else {
 					ary.append(asConcreteNode(node))
@@ -76,7 +76,7 @@ public extension XNode {
 			defer {
 				xmlFree(chars)
 			}
-			return .string(String(validatingUTF8: UnsafePointer(chars)) ?? "")
+			return .string(String(validatingUTF8: UnsafeRawPointer(chars).assumingMemoryBound(to: Int8.self)) ?? "")
 		}
 	}
 	/// Execute the XPath and return the result(s).
