@@ -35,6 +35,14 @@ Add this project as a dependency in your Package.swift file.
 .Package(url:"https://github.com/PerfectlySoft/Perfect-XML.git", versions: Version(0,0,0)..<Version(10,0,0))
 ```
 
+## Linux Build Notes
+
+Ensure that you have installed libcurl.
+
+```
+sudo apt-get install libxml2-dev
+```
+
 ## Examples
 
 To utilize this package, ```import PerfectXML```.
