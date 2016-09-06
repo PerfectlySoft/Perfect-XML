@@ -32,7 +32,7 @@ A comprehensive list of open issues can be found at [http://jira.perfect.org:808
 Add this project as a dependency in your Package.swift file.
 
 ```
-.Package(url:"https://github.com/PerfectlySoft/Perfect-XML.git", versions: Version(0,0,0)..<Version(10,0,0))
+.Package(url:"https://github.com/PerfectlySoft/Perfect-XML.git", majorVersion: 2, minor: 0)
 ```
 
 ## Linux Build Notes
