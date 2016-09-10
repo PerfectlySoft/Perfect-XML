@@ -35,12 +35,33 @@ Add this project as a dependency in your Package.swift file.
 .Package(url:"https://github.com/PerfectlySoft/Perfect-XML.git", majorVersion: 2, minor: 0)
 ```
 
-## Linux Build Notes
+## macOS Build Notes
 
-Ensure that you have installed libcurl.
+If you receive a compile error that says the following, you need to install and link libxml2
 
 ```
-sudo apt-get install libxml2-dev
+note: you may be able to install libxml-2.0 using your system-packager:
+
+    brew install libxml2
+
+Compile Swift Module 'PerfectXML' (2 sources)
+<module-includes>:1:9: note: in file included from <module-includes>:1:
+#import "libxml2.h"
+```
+
+To install and link libxml2 with homebrew, use the following two commands
+
+```
+brew install libxml2
+brew link --force libxml2
+```
+
+## Linux Build Notes
+
+Ensure that you have installed libxml2-dev and pkg-config.
+
+```
+sudo apt-get install libxml2-dev pkg-config
 ```
 
 ## Examples
