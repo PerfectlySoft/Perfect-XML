@@ -64,9 +64,113 @@ Ensure that you have installed libxml2-dev and pkg-config.
 sudo apt-get install libxml2-dev pkg-config
 ```
 
-## Examples
+## Usage
 
-To utilize this package, ```import PerfectXML```.
+Instantiate an XDocument object with your XML string
+
+```swift
+import PerfectXML
+let document = XDocument(fromSource: xmlString)
+```
+
+Now you can get the root node of the XML structure by using the documentElement property
+
+```swift
+print(document.documentElement?.string(pretty: true))
+```
+
+Each node has several important properties
+
+- nodeValue
+- nodeName
+- parentNode
+- childNodes
+
+Each node also has a getElementsByTagName: method that recursively searches through it and its children to return an array of all nodes that have that name. This method makes it easy to find a single value in the XML file.
+
+```swift
+import PerfectXML
+
+let serverResponseXML = "<?xml version=\"1.0\" encoding=\"utf-8\"?>\n" +
+"<Autodiscover xmlns=\"http://schemas.microsoft.com/exchange/autodiscover/responseschema/2006\">" + 
+"  <Response>" + 
+"    <Error Time=\"14:52:25.4524532\" Id=\"3280124998\">" + 
+"      <ErrorCode>600</ErrorCode>" + 
+"      <Message>Invalid Request</Message>" +
+"      <DebugData />" +
+"    </Error>" + 
+"  </Response>" +
+"</Autodiscover>"
+
+let serverResponseDocument = XDocument(fromSource: serverResponseXML)
+let serverMessage = serverResponseDocument?.documentElement?.getElementsByTagName("Message").first?.nodeValue
+print(serverMessage) // prints Optional("Invalid Request")
+```
+
+Constructing model types from XML feeds is easy with getElementsByTagName
+
+```swift
+import PerfectXML
+
+let rssXML = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" +
+"<rss version=\"2.0\">" +
+"  <channel>" +
+"    <title>W3Schools Home Page</title>" +
+"    <link>http://www.w3schools.com</link>" +
+"    <description>Free web building tutorials</description>" +
+"    <item>" +
+"      <title>RSS Tutorial</title>" +
+"      <link>http://www.w3schools.com/xml/xml_rss.asp</link>" +
+"      <description>New RSS tutorial on W3Schools</description>" +
+"    </item>" +
+"    <item>" +
+"      <title>XML Tutorial</title>" +
+"      <link>http://www.w3schools.com/xml</link>" +
+"      <description>New XML tutorial on W3Schools</description>" +
+"    </item>" +
+"  </channel>" +
+"</rss>"
+
+let rssDocument = XDocument(fromSource: rssXML)
+let feedItems = rssDocument?.documentElement?.getElementsByTagName("item")
+print(feedItems?.count) // prints 2
+let items = feedItems?.map({ MyCustomStruct(xmlNode: $0) })
+```
+
+Sometimes tag names are a bit too generic in order to meaningfully search for them, such as "title" in the example above. If we wanted to get the Channel title, link, and description, we could visit each of its children in a more deliberate way.
+
+```swift
+import PerfectXML
+
+let rssXML = "<?xml version=\"1.0\" encoding=\"UTF-8\" ?>" +
+"<rss version=\"2.0\">" +
+"  <channel>" +
+"    <title>W3Schools Home Page</title>" +
+"    <link>http://www.w3schools.com</link>" +
+"    <description>Free web building tutorials</description>" +
+"    <item>" +
+"      <title>RSS Tutorial</title>" +
+"      <link>http://www.w3schools.com/xml/xml_rss.asp</link>" +
+"      <description>New RSS tutorial on W3Schools</description>" +
+"    </item>" +
+"    <item>" +
+"      <title>XML Tutorial</title>" +
+"      <link>http://www.w3schools.com/xml</link>" +
+"      <description>New XML tutorial on W3Schools</description>" +
+"    </item>" +
+"  </channel>" +
+"</rss>"
+
+let rssDocument = XDocument(fromSource: rssXML)
+let channelNode = rssDocument?.documentElement?.getElementsByTagName("channel").first
+let channelTitle = channelNode?.childNodes.filter({ $0.nodeName == "title" }).first?.nodeValue
+let channelLink = channelNode?.childNodes.filter({ $0.nodeName == "link" }).first?.nodeValue
+let channelDescription = channelNode?.childNodes.filter({ $0.nodeName == "description" }).first?.nodeValue
+
+print(channelTitle) // Optional("W3Schools Home Page")
+print(channelLink) // Optional("http://www.w3schools.com")
+print(channelDescription) // Optional("Free web building tutorials")
+```
 
 ### Parse XML Source
 
