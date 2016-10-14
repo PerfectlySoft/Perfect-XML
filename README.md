@@ -99,7 +99,14 @@ import PerfectXML
 let document = XDocument(fromSource: xmlString)
 ```
 
-Now you can get the root node of the XML structure by using the documentElement property
+Instantiate an HTMLDocument object with your HTML string
+
+```swift
+import PerfectXML
+let document = HTMLDocument(fromSource: htmlString)
+```
+
+Now you can get the root node of the document structure by using the documentElement property
 
 ```swift
 print(document.documentElement?.string(pretty: true))
