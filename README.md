@@ -41,7 +41,7 @@
         <img src="http://perfect.ly/badge.svg" alt="Slack Status">
     </a>
 </p>
-XML support for Perfect
+XML &amp; HTML parsing support for Perfect
 
 It currently contains most of the DOM Core level 2 *read-only* APIs and includes XPath support.
 
@@ -207,6 +207,17 @@ let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b><c a=\"attr1\">H
 let doc = XDocument(fromSource: docSrc)
 let str = doc?.string(pretty: false)
 XCTAssert(str == docSrc, "\(str)")
+```
+
+### Parse HTML Source
+
+This snippet will parse an HTML source string.
+
+```swift
+let docSrc = "<html>\n<head>\n<title>title</title></head>\n<body>\n<div>hi</div>\n</body>\n</html>\n"
+let doc = HTMLDocument(fromSource: docSrc)
+let nodeName = doc?.documentElement?.nodeName
+XCTAssert(nodeName == "html")
 ```
 
 ### Inspect Node Names
