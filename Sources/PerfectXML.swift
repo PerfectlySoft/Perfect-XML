@@ -312,6 +312,19 @@ public class XDocument: XNode {
 	}
 }
 
+public class HTMLDocument: XDocument {
+	/// Parse the HTML source string and create the document, if possible.
+	public init?(fromSource: String, encoding: String = "UTF-8") {
+		_ = XDocument.initialize
+		let src = Array(fromSource.utf8)
+		let p = UnsafeMutablePointer<UInt8>(mutating: UnsafePointer(src))
+		guard let doc = htmlParseDoc(p, encoding) else {
+			return nil
+		}
+		super.init(doc)
+	}
+}
+
 /// An XML element node.
 public class XElement: XNode {
 	/// The name of the element.

@@ -8,7 +8,14 @@ class PerfectXMLTests: XCTestCase {
 		let doc = XDocument(fromSource: docSrc)
 		let str = doc?.string(pretty: false)
 		XCTAssert(str == docSrc, "\(str)")
-    }
+	}
+	
+	func testHTMLParse1() {
+		let docSrc = "<html>\n<head>\n<title>title</title></head>\n<body>\n<div>hi</div>\n</body>\n</html>\n"
+		let doc = HTMLDocument(fromSource: docSrc)
+		let nodeName = doc?.documentElement?.nodeName
+		XCTAssert(nodeName == "html")
+	}
 	
 	func testNodeName1() {
 		let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b/><c/><d/></a>\n"
