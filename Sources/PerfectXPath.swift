@@ -92,13 +92,13 @@ public extension XNode {
 			var errorMsgs = [String]()
 		}
 		let errorTracker = ErrorTracker()
-		ctx.pointee.userData = Unmanaged.passRetained(errorTracker).toOpaque()
+		ctx.pointee.userData = Unmanaged.passUnretained(errorTracker).toOpaque()
 		ctx.pointee.error = {
 			userData, error in
 			guard let userData = userData else {
 				return
 			}
-			let errorTracker: ErrorTracker = Unmanaged.fromOpaque(userData).takeRetainedValue()
+			let errorTracker: ErrorTracker = Unmanaged.fromOpaque(userData).takeUnretainedValue()
 			
 			print("help")
 		}
