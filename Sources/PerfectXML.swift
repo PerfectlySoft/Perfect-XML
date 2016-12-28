@@ -282,6 +282,16 @@ public class XDocument: XNode {
 		super.init(toNodePtr(doc), document: nil)
 	}
 	
+	/// Parse the HTML source string and create the document, if possible.
+	public init?(fromHTML: String, charset: String) {
+		_ = XDocument.initialize
+		let source = xmlCharStrdup(fromHTML)
+		guard let doc = htmlParseDoc(source, charset) else {
+			return nil
+		}
+		super.init(toNodePtr(doc), document: nil)
+	}
+
 	init(_ ptr: xmlDocPtr) {
 		super.init(toNodePtr(ptr), document: nil)
 	}
