@@ -231,7 +231,7 @@ public class XNode: CustomStringConvertible {
 //		case XML_XINCLUDE_END:
 //		case XML_DOCB_DOCUMENT_NODE:
 		default: ()
-			print("Unhandled node type \(ptr.pointee.type)")
+//			print("Unhandled node type \(ptr.pointee.type)")
 			return XNode(ptr, document: self.ownerDocument)
 		}
 	}
