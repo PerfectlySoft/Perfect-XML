@@ -24,7 +24,7 @@ func toNodePtr<T>(_ p: T) -> xmlNodePtr {
 }
 
 func fromNodePtr<T>(_ nodePtr: xmlNodePtr) -> UnsafeMutablePointer<T> {
-	return unsafeBitCast(nodePtr, to: UnsafeMutablePointer<T>.self)
+	return nodePtr.withMemoryRebound(to: T.self, capacity: 1) { return $0 }
 }
 
 private typealias ForEachFunc = (_ node: xmlNodePtr) -> Bool
@@ -40,6 +40,10 @@ private func forEach(node: xmlNodePtr, childrenOnly: Bool, continueFunc: ForEach
 		c = cnode.pointee.next
 	}
 	return true
+}
+
+final class XErrorTracker {
+	var errorMsgs = [String]()
 }
 
 /// Supported XML node types.
@@ -251,6 +255,8 @@ public class XNode: CustomStringConvertible {
 		return self.string()
 	}
 }
+
+
 
 /// An XML document.
 public class XDocument: XNode {

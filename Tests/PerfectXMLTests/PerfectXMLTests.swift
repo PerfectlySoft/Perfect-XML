@@ -7,7 +7,7 @@ class PerfectXMLTests: XCTestCase {
         let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b><c a=\"attr1\">HI</c><d/></b></a>\n"
 		let doc = XDocument(fromSource: docSrc)
 		let str = doc?.string(pretty: false)
-		XCTAssert(str == docSrc, "\(str)")
+		XCTAssert(str == docSrc, "\(String(describing: str))")
 	}
 	
 	func testHTMLParse1() {

@@ -88,17 +88,15 @@ public extension XNode {
 		defer {
 			xmlXPathFreeContext(ctx)
 		}
-		final class ErrorTracker {
-			var errorMsgs = [String]()
-		}
-		let errorTracker = ErrorTracker()
+		
+		let errorTracker = XErrorTracker()
 		ctx.pointee.userData = Unmanaged.passUnretained(errorTracker).toOpaque()
 		ctx.pointee.error = {
 			userData, error in
 			guard let userData = userData else {
 				return
 			}
-			let errorTracker: ErrorTracker = Unmanaged.fromOpaque(userData).takeUnretainedValue()
+			let errorTracker: XErrorTracker = Unmanaged.fromOpaque(userData).takeUnretainedValue()
 			
 			print("help")
 		}
