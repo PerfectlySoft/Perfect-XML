@@ -25,20 +25,37 @@ extension String {
 		guard let n = p else {
 			return nil
 		}
-		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, {
-					return String(validatingUTF8: $0)
-				}) else {
+		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, { String(validatingUTF8: $0) }) else {
 			return nil
 		}
 		self = s
 	}
+	init(_ p: UnsafePointer<xmlChar>?, default: String) {
+		guard let n = p else {
+			self = `default`
+			return
+		}
+		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, { String(validatingUTF8: $0) }) else {
+			self = `default`
+			return
+		}
+		self = s
+	}
 }
+
 
 func asContext(_ a: AnyObject) -> UnsafeMutableRawPointer {
 	return Unmanaged.passUnretained(a).toOpaque()
 }
 
 func fromContext<A: AnyObject>(_ type: A.Type, _ context: UnsafeMutableRawPointer) -> A {
+	return Unmanaged<A>.fromOpaque(context).takeUnretainedValue()
+}
+
+func fromContext<A: AnyObject>(_ type: A.Type, _ context: UnsafeMutableRawPointer?) -> A? {
+	guard let context = context else {
+		return nil
+	}
 	return Unmanaged<A>.fromOpaque(context).takeUnretainedValue()
 }
 
