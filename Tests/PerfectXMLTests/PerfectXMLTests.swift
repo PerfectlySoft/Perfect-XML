@@ -446,6 +446,81 @@ class PerfectXMLTests: XCTestCase {
 		}
 	}
 	
+//	func testXMLEncode() {
+//		struct ChildType: Codable {
+//
+//		}
+//		struct DocumentType: Codable {
+//			let id: Int
+//			let str: String
+//			let double: Double
+//		}
+//		do {
+//			let doc = DocumentType(id: 42, str: "This is the string & stuff.", double: 42.3)
+//			let data = try XMLEncoder().encode(doc, rootName: "document")
+//			guard let str = String(data: data, encoding: .utf8) else {
+//				return XCTFail("Bad data from encoding.")
+//			}
+//			let testAgainst = "<document><id>42</id><str>This is the string &amp; stuff.</str></document>"
+//			XCTAssertEqual(str, testAgainst)
+//		} catch {
+//			XCTFail("\(error)")
+//		}
+//	}
+	
+	func testXMLStream() {
+		struct ChunkyProvider: XMLStreamDataProvider {
+			let source: [UInt8]
+			let maxReturn = 4
+			var offset: Int = 0
+			init(_ s: String) {
+				source = Array(s.utf8)
+			}
+			mutating func getData(maxCount: Int) throws -> Data? {
+				let remaining = source.count - offset
+				guard remaining > 0 else {
+					return nil
+				}
+				let a = source[offset..<(offset + min(maxReturn, min(remaining, maxCount)))]
+				offset += a.count
+				return Data(bytes: a)
+			}
+			func close() {
+				print("ChunkyProvider.close()")
+			}
+		}
+		do {
+			let provider = ChunkyProvider("<A><B a=\"value\">CONTENT</B><C/><D><E/></D></A>")
+			let stream = XMLStream(provider: provider)
+			
+			let checks: [(XMLStream.NodeType, String, String?, Bool, Int, String?)] = [
+				(.element, "A", nil, false, 0, nil),
+				(.element, "B", nil, false, 1, "value"),
+				(.text, "#text", "CONTENT", false, 0, nil),
+				(.endElement, "B", nil, false, 0, "value"),
+				(.element, "C", nil, true, 0, nil),
+				(.element, "D", nil, false, 0, nil),
+				(.element, "E", nil, true, 0, nil),
+				(.endElement, "D", nil, false, 0, nil),
+				(.endElement, "A", nil, false, 0, nil),
+			]
+			
+			for check in checks {
+				guard let item = try stream.next() else {
+					return XCTFail("No item")
+				}
+				XCTAssertEqual(item.type!, check.0)
+				XCTAssertEqual(item.localName, check.1)
+				XCTAssertEqual(item.value, check.2)
+				XCTAssertEqual(item.isEmpty, check.3)
+				XCTAssertEqual(item.attributeCount, check.4)
+				XCTAssertEqual(item.getAttribute("a"), check.5)
+			}
+		} catch {
+			XCTFail("\(error)")
+		}
+	}
+	
     static var allTests : [(String, (PerfectXMLTests) -> () throws -> Void)] {
 		return [
 			("testDocParse1", testDocParse1),
@@ -469,6 +544,7 @@ class PerfectXMLTests: XCTestCase {
 			("testXPath3", testXPath3),
 			("testXPath4", testXPath4),
 			("testXPath5", testXPath5),
+			("testXMLStream", testXMLStream)
 			
         ]
     }

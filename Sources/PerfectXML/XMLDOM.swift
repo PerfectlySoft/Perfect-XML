@@ -52,6 +52,35 @@ public enum XNodeType {
 	case entityNode, processingInstruction, commentNode, documentNode, documentTypeNode
 	case documentFragmentNode, notationNode
 	case unknownNodeType
+	init(_ i: Int32) {
+		self.init(xmlElementType(UInt32(i)))
+	}
+	init(_ type: xmlElementType) {
+		switch type {
+		case XML_ELEMENT_NODE: self = .elementNode
+		case XML_ATTRIBUTE_NODE: self = .attributeNode
+		case XML_TEXT_NODE: self = .textNode
+		case XML_CDATA_SECTION_NODE: self = .cDataSection
+		case XML_ENTITY_REF_NODE: self = .entityReferenceNode
+		case XML_ENTITY_NODE: self = .entityNode
+		case XML_PI_NODE: self = .processingInstruction
+		case XML_COMMENT_NODE: self = .commentNode
+		case XML_DOCUMENT_NODE: self = .documentNode
+		case XML_DOCUMENT_TYPE_NODE: self = .documentTypeNode
+		case XML_DOCUMENT_FRAG_NODE: self = .documentFragmentNode
+		case XML_NOTATION_NODE: self = .notationNode
+		default: self = .unknownNodeType
+			//			XML_HTML_DOCUMENT_NODE = 13
+			//			XML_DTD_NODE = 14
+			//			XML_ELEMENT_DECL = 15
+			//			XML_ATTRIBUTE_DECL = 16
+			//			XML_ENTITY_DECL = 17
+			//			XML_NAMESPACE_DECL = 18
+			//			XML_XINCLUDE_START = 19
+			//			XML_XINCLUDE_END = 20
+			//			XML_DOCB_DOCUMENT_NODE
+		}
+	}
 }
 
 /// Base class for all XML nodes.
@@ -78,32 +107,8 @@ public class XNode: CustomStringConvertible {
 		return String(validatingUTF8: UnsafeMutableRawPointer(content).assumingMemoryBound(to: Int8.self))
 	}
 	/// A code representing the type of the underlying object.
-	public var nodeType: XNodeType {
-		switch nodePtr.pointee.type {
-		case XML_ELEMENT_NODE: return .elementNode
-		case XML_ATTRIBUTE_NODE: return .attributeNode
-		case XML_TEXT_NODE: return .textNode
-		case XML_CDATA_SECTION_NODE: return .cDataSection
-		case XML_ENTITY_REF_NODE: return .entityReferenceNode
-		case XML_ENTITY_NODE: return .entityNode
-		case XML_PI_NODE: return .processingInstruction
-		case XML_COMMENT_NODE: return .commentNode
-		case XML_DOCUMENT_NODE: return .documentNode
-		case XML_DOCUMENT_TYPE_NODE: return .documentTypeNode
-		case XML_DOCUMENT_FRAG_NODE: return .documentFragmentNode
-		case XML_NOTATION_NODE: return .notationNode
-		default: return .unknownNodeType
-//			XML_HTML_DOCUMENT_NODE = 13
-//			XML_DTD_NODE = 14
-//			XML_ELEMENT_DECL = 15
-//			XML_ATTRIBUTE_DECL = 16
-//			XML_ENTITY_DECL = 17
-//			XML_NAMESPACE_DECL = 18
-//			XML_XINCLUDE_START = 19
-//			XML_XINCLUDE_END = 20
-//			XML_DOCB_DOCUMENT_NODE
-		}
-	}
+	public var nodeType: XNodeType { return XNodeType(nodePtr.pointee.type) }
+	
 	/// The parent of this node. All nodes, except Attr, Document, DocumentFragment, Entity, and Notation may have a parent. However, if a node has just been created and not yet added to the tree, or if it has been removed from the tree, this is null.
 	public var parentNode: XNode? {
 		guard let parentNode = nodePtr.pointee.parent else {
