@@ -527,10 +527,10 @@ class PerfectXMLTests: XCTestCase {
 				var opens = ["A", "B", "C", "D", "E"]
 				var closes = ["B", "C", "E", "D", "A"]
 				
-				func startElementNs(localName: String, prefix: String?, uri: String?, namespaces: [String], attributes: [String]) {
+				func startElementNs(localName: String, prefix: String?, uri: String?, namespaces: [SAXDelegateNamespace], attributes: [SAXDelegateAttribute]) {
 					XCTAssertEqual(opens.removeFirst(), localName)
 					if localName == "B" {
-						XCTAssertEqual("a", attributes.first)
+						XCTAssertEqual("a", attributes.first?.localName)
 					}
 				}
 				func endElementNs(localName: String, prefix: String?, uri: String?) {
@@ -539,7 +539,7 @@ class PerfectXMLTests: XCTestCase {
 			}
 			let d = TestDelegate()
 			let sax = SAXParser(delegate: d)
-			let bytes = Array("<A><B a=\"value\">CONTENT</B><C/><D><E/></D></A>".utf8)
+			let bytes = Array("<A><foo:B xmlns:foo=\"123\" foo:a=\"value\">CONTENT</foo:B><C/><D><E/></D></A>".utf8)
 			for n in stride(from: 0, to: bytes.count, by: 4) {
 				let upper = min(n+4, bytes.count)
 				let range = bytes[n..<upper]

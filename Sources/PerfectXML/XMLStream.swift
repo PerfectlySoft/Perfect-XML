@@ -41,6 +41,18 @@ extension String {
 		}
 		self = s
 	}
+	init(_ p: UnsafePointer<xmlChar>?, count: Int, default: String) {
+		guard let n = p else {
+			self = `default`
+			return
+		}
+		let a = (0..<count).map { Int8(n[$0]) } + [0]
+		guard let s = String(validatingUTF8: a) else {
+			self = `default`
+			return
+		}
+		self = s
+	}
 }
 
 

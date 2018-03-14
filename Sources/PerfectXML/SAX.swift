@@ -28,74 +28,77 @@ public protocol SAXDelegate {
 	func startElementNs(localName: String,
 						prefix: String?,
 						uri: String?,
-						namespaces: [String],
-						attributes: [String])
+						namespaces: [SAXDelegateNamespace],
+						attributes: [SAXDelegateAttribute])
 	func endElementNs(localName: String,
 					  prefix: String?,
 					  uri: String?)
 	func characters(_ c: String)
+	func ignorableWhitespace(_ c: String)
 	func cdataBlock(_ c: String)
+}
+
+public struct SAXDelegateNamespace {
+	let prefix: String?
+	let uri: String
+}
+
+public struct SAXDelegateAttribute {
+	let localName: String
+	let prefix: String?
+	let nsUri: String?
+	let value: String
 }
 
 public extension SAXDelegate {
 	func startDocument() {
 		print(#function)
 	}
-	
 	func endDocument() {
 		print(#function)
 	}
-	
 	func processingInstruction(target: String, data: String) {
 		print(#function)
 	}
-	
 	func entityDecl(name: String, type: Int, pubicId: String, systemId: String, content: String) {
 		print(#function)
 	}
-	
 	func unparsedEntityDecl(name: String, pubicId: String, systemId: String, notationName: String) {
 		print(#function)
 	}
-	
 	func notationDecl(name: String, pubicId: String, systemId: String) {
 		print(#function)
 	}
-	
 	func attributeDecl(elem: String, fullName: String, type: Int, def: Int, defaultValue: String?, tree: xmlEnumerationPtr?) {
 		print(#function)
 	}
-	
 	func elementDecl(name: String, type: Int, content: xmlElementContentPtr?) {
 		print(#function)
 	}
-	
 	func reference(name: String) {
 		print(#function)
 	}
-	
 	func comment(_ c: String) {
 		print(#function)
 	}
-	
 	func startElementNs(localName: String,
 						prefix: String?,
 						uri: String?,
-						namespaces: [String],
-						attributes: [String]) {
+						namespaces: [SAXDelegateNamespace],
+						attributes: [SAXDelegateAttribute]) {
 		print(#function)
 	}
-	
 	func endElementNs(localName: String,
 					  prefix: String?,
 					  uri: String?) {
 		print(#function)
 	}
-	
 	func characters(_ c: String) {
 		print(#function)
 	}
-	
+	func ignorableWhitespace(_ c: String) {
+		print(#function)
+	}
 	func cdataBlock(_ c: String) {
 		print(#function)
 	}
@@ -107,7 +110,7 @@ public class SAXParser {
 	var parserCtxt: xmlParserCtxtPtr?
 	public init(delegate d: SAXDelegate) {
 		delegate = d
-		//xmlSAXVersion(&handler, 2)
+		
 	}
 	deinit {
 		if let c = parserCtxt {
@@ -139,11 +142,47 @@ public class SAXParser {
 		xmlParseChunk(try getCtxt(), nil, 0, 0)
 	}
 	
-	private static func ptr2Ary(_ ptr: UnsafeMutablePointer<UnsafePointer<xmlChar>?>?, count: Int) -> [String] {
+	private static func ptr2AryNamespaces(_ ptr: UnsafeMutablePointer<UnsafePointer<xmlChar>?>?, count: Int) -> [SAXDelegateNamespace] {
 		guard let ptr = ptr else {
 			return []
 		}
-		return (0..<count).map { String(ptr[$0]) }.flatMap { $0 }
+		var ret: [SAXDelegateNamespace] = []
+		for i in stride(from: 0, to: count, by: 2) {
+			let ptr1 = ptr[i]
+			let ptr2 = ptr[i+1]
+			ret.append(.init(prefix: String(ptr1), uri: String(ptr2, default: "")))
+		}
+		return ret
+	}
+	
+	private static func ptr2AryAttributes(_ ptr: UnsafeMutablePointer<UnsafePointer<xmlChar>?>?, count: Int) -> [SAXDelegateAttribute] {
+		guard let ptr = ptr else {
+			return []
+		}
+		var ret: [SAXDelegateAttribute] = []
+		for i in stride(from: 0, to: count, by: 5) {
+			let namePtr = ptr[i]
+			let prefixPtr = ptr[i+1]
+			let nsUri = ptr[i+2]
+			let value: String
+			if let valueStartPtr = ptr[i+3],
+					let valueEndPtr = ptr[i+4] {
+				if valueEndPtr.pointee == 0 {
+					value = String(valueStartPtr, default: "")
+				} else {
+					let valueLen = valueEndPtr - valueStartPtr
+					value = String(valueStartPtr, count: valueLen, default: "")
+				}
+			} else {
+				value = ""
+			}
+			ret.append(.init(
+				localName: String(namePtr, default: ""),
+				prefix: String(prefixPtr),
+				nsUri: String(nsUri),
+				value: value))
+		}
+		return ret
 	}
 	
 	private func setHandlerFuncs() throws {
@@ -154,8 +193,8 @@ public class SAXParser {
 			fromContext(SAXParser.self, a)?.delegate.startElementNs(localName: String(b, default: ""),
 								  prefix: String(c),
 								  uri: String(d),
-								  namespaces: SAXParser.ptr2Ary(f, count: Int(e)),
-								  attributes: SAXParser.ptr2Ary(i, count: Int(g)))
+								  namespaces: SAXParser.ptr2AryNamespaces(f, count: Int(e)),
+								  attributes: SAXParser.ptr2AryAttributes(i, count: Int(g)))
 		}
 		handler.endElementNs = {
 			fromContext(SAXParser.self, $0)?.delegate.endElementNs(
@@ -203,9 +242,9 @@ public class SAXParser {
 		handler.startDocument = { fromContext(SAXParser.self, $0)?.delegate.startDocument() }
 		handler.endDocument = {	fromContext(SAXParser.self, $0)?.delegate.endDocument() }
 		handler.reference = { fromContext(SAXParser.self, $0)?.delegate.reference(name: String($1, default: "")) }
-		handler.characters = { fromContext(SAXParser.self, $0)?.delegate.characters(String($1, default: "")) ; _ = $2 }
-		handler.cdataBlock = { fromContext(SAXParser.self, $0)?.delegate.cdataBlock(String($1, default: "")) ; _ = $2 }
-		handler.ignorableWhitespace = { fromContext(SAXParser.self, $0)?.delegate.characters(String($1, default: "")) ; _ = $2 };
+		handler.characters = { fromContext(SAXParser.self, $0)?.delegate.characters(String($1, count: Int($2), default: "")) }
+		handler.cdataBlock = { fromContext(SAXParser.self, $0)?.delegate.cdataBlock(String($1, count: Int($2), default: "")) }
+		handler.ignorableWhitespace = { fromContext(SAXParser.self, $0)?.delegate.ignorableWhitespace(String($1, default: "")) ; _ = $2 };
 		handler.processingInstruction = { fromContext(SAXParser.self, $0)?.delegate.processingInstruction(target: String($1, default: ""), data: String($2, default: "")) }
 		handler.comment = { fromContext(SAXParser.self, $0)?.delegate.comment(String($1, default: "")) }
 		handler.warning = nil//xmlParserWarning;
