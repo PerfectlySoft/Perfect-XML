@@ -73,7 +73,7 @@ public class XMLStream {
 		}
 		let readCallback: xmlInputReadCallback = {
 			context, buffer, bufferSize -> Int32 in
-			guard let context = context else {
+			guard let context = context, let buffer = buffer else {
 				return -1
 			}
 			let me = fromContext(XMLStream.self, context)

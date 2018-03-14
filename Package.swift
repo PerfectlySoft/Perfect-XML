@@ -9,7 +9,7 @@ let package = Package(
 		.library(name: "PerfectXML", targets: ["PerfectXML"])
 	],
 	dependencies: [
-		.package(url: "https://github.com/PerfectlySoft/Perfect-libxml2.git", from: "2.1.0"),
+		.package(url: "https://github.com/PerfectlySoft/Perfect-libxml2.git", from: "2.1.3"),
 	],
 	targets: [
 		.target(name: "PerfectXML", dependencies: []),
