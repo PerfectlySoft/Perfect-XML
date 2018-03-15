@@ -39,69 +39,40 @@ public protocol SAXDelegate {
 }
 
 public struct SAXDelegateNamespace {
-	let prefix: String?
-	let uri: String
+	public let prefix: String?
+	public let uri: String
 }
 
 public struct SAXDelegateAttribute {
-	let localName: String
-	let prefix: String?
-	let nsUri: String?
-	let value: String
+	public let localName: String
+	public let prefix: String?
+	public let nsUri: String?
+	public let value: String
 }
 
+/// Default implimentations do nothing
 public extension SAXDelegate {
-	func startDocument() {
-		print(#function)
-	}
-	func endDocument() {
-		print(#function)
-	}
-	func processingInstruction(target: String, data: String) {
-		print(#function)
-	}
-	func entityDecl(name: String, type: Int, pubicId: String, systemId: String, content: String) {
-		print(#function)
-	}
-	func unparsedEntityDecl(name: String, pubicId: String, systemId: String, notationName: String) {
-		print(#function)
-	}
-	func notationDecl(name: String, pubicId: String, systemId: String) {
-		print(#function)
-	}
-	func attributeDecl(elem: String, fullName: String, type: Int, def: Int, defaultValue: String?, tree: xmlEnumerationPtr?) {
-		print(#function)
-	}
-	func elementDecl(name: String, type: Int, content: xmlElementContentPtr?) {
-		print(#function)
-	}
-	func reference(name: String) {
-		print(#function)
-	}
-	func comment(_ c: String) {
-		print(#function)
-	}
+	func startDocument() {}
+	func endDocument() {}
+	func processingInstruction(target: String, data: String) {}
+	func entityDecl(name: String, type: Int, pubicId: String, systemId: String, content: String) {}
+	func unparsedEntityDecl(name: String, pubicId: String, systemId: String, notationName: String) {}
+	func notationDecl(name: String, pubicId: String, systemId: String) {}
+	func attributeDecl(elem: String, fullName: String, type: Int, def: Int, defaultValue: String?, tree: xmlEnumerationPtr?) {}
+	func elementDecl(name: String, type: Int, content: xmlElementContentPtr?) {}
+	func reference(name: String) {}
+	func comment(_ c: String) {}
 	func startElementNs(localName: String,
 						prefix: String?,
 						uri: String?,
 						namespaces: [SAXDelegateNamespace],
-						attributes: [SAXDelegateAttribute]) {
-		print(#function)
-	}
+						attributes: [SAXDelegateAttribute]) {}
 	func endElementNs(localName: String,
 					  prefix: String?,
-					  uri: String?) {
-		print(#function)
-	}
-	func characters(_ c: String) {
-		print(#function)
-	}
-	func ignorableWhitespace(_ c: String) {
-		print(#function)
-	}
-	func cdataBlock(_ c: String) {
-		print(#function)
-	}
+					  uri: String?) {}
+	func characters(_ c: String) {}
+	func ignorableWhitespace(_ c: String) {}
+	func cdataBlock(_ c: String) {}
 }
 
 public class SAXParser {
@@ -147,7 +118,7 @@ public class SAXParser {
 			return []
 		}
 		var ret: [SAXDelegateNamespace] = []
-		for i in stride(from: 0, to: count, by: 2) {
+		for i in stride(from: 0, to: count*2, by: 2) {
 			let ptr1 = ptr[i]
 			let ptr2 = ptr[i+1]
 			ret.append(.init(prefix: String(ptr1), uri: String(ptr2, default: "")))
@@ -160,7 +131,7 @@ public class SAXParser {
 			return []
 		}
 		var ret: [SAXDelegateAttribute] = []
-		for i in stride(from: 0, to: count, by: 5) {
+		for i in stride(from: 0, to: count*5, by: 5) {
 			let namePtr = ptr[i]
 			let prefixPtr = ptr[i+1]
 			let nsUri = ptr[i+2]
