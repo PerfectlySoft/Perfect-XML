@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import libxml2
+import perfectxml2
 
 public protocol XMLStreamDataProvider {
 	mutating func getData(maxCount: Int) throws -> Data?

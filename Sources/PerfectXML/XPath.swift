@@ -6,7 +6,7 @@
 //
 //
 
-import libxml2
+import perfectxml2
 
 /// An XPath result object type.
 public enum XPathObject {

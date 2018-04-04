@@ -17,7 +17,7 @@
 //===----------------------------------------------------------------------===//
 //
 
-import libxml2
+import perfectxml2
 
 func toNodePtr<T>(_ p: T) -> xmlNodePtr {
 	return unsafeBitCast(p, to: UnsafeMutablePointer<xmlNode>.self)
