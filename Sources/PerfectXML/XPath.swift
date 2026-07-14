@@ -74,14 +74,14 @@ public extension XNode {
 				return .none
 			}
 			defer {
-				xmlFree(chars)
+				libxmlFree(chars)
 			}
-			return .string(String(validatingUTF8: UnsafeRawPointer(chars).assumingMemoryBound(to: Int8.self)) ?? "")
+			return .string(String(validatingCString: UnsafeRawPointer(chars).assumingMemoryBound(to: Int8.self)) ?? "")
 		}
 	}
 	/// Execute the XPath and return the result(s).
 	/// Accepts and array of tuples holding namespace prefixes and uris.
-	public func extract(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XPathObject {
+	func extract(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XPathObject {
 		guard let ctx = initializeContext() else {
 			return .none
 		}
@@ -97,8 +97,7 @@ public extension XNode {
 				return
 			}
 			let errorTracker: XErrorTracker = Unmanaged.fromOpaque(userData).takeUnretainedValue()
-			
-			print("help")
+			_ = errorTracker
 		}
 		
 		for (prefix, uri) in namespaces {
@@ -115,7 +114,7 @@ public extension XNode {
 	}
 	/// Execute the XPath and return a single resul tnode or nil.
 	/// Accepts and array of tuples holding namespace prefixes and uris.
-	public func extractOne(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XNode? {
+	func extractOne(path: String, namespaces: [(String, String)] = [(String, String)]()) -> XNode? {
 		guard case .nodeSet(let nodes) = extract(path: path, namespaces: namespaces) else {
 			return nil
 		}

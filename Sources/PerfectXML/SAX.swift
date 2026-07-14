@@ -75,7 +75,12 @@ public extension SAXDelegate {
 	func cdataBlock(_ c: String) {}
 }
 
-public class SAXParser {
+/// `@unchecked Sendable`: wraps a raw libxml2 push-parser context with no
+/// internal synchronization. See `XNode`'s doc comment (`XMLDOM.swift`)
+/// for this package's general thread-confinement contract — the same
+/// applies here: drive one `SAXParser` instance's `pushData`/`finish`
+/// calls from a single task.
+public class SAXParser: @unchecked Sendable {
 	var handler = xmlSAXHandler()
 	var delegate: SAXDelegate
 	var parserCtxt: xmlParserCtxtPtr?
@@ -102,8 +107,11 @@ public class SAXParser {
 	}
 	public func pushData(_ d: [UInt8]) throws {
 		let ctx = try getCtxt()
-		let code = UnsafePointer(d).withMemoryRebound(to: Int8.self, capacity: d.count) {
-			return xmlParseChunk(ctx, $0, Int32(d.count), 0)
+		let code = d.withUnsafeBufferPointer { buffer -> Int32 in
+			guard let base = buffer.baseAddress else { return 0 }
+			return base.withMemoryRebound(to: Int8.self, capacity: buffer.count) {
+				xmlParseChunk(ctx, $0, Int32(buffer.count), 0)
+			}
 		}
 		guard 0 == code else {
 			throw SAXError("Error parsing chunk: \(code).")
