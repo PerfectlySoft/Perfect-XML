@@ -14,7 +14,7 @@
 
 XML &amp; HTML parsing support for [Perfect-Resurrection](https://github.com/taplin), a maintained fork/resurrection of the original PerfectlySoft [Perfect-XML](https://github.com/PerfectlySoft/Perfect-XML) library.
 
-This is real, active, load-bearing infrastructure: `Perfect-FileMaker` imports `PerfectXML` (in 3 source files) to parse the FileMaker XML Data API, and `Perfect-FileMaker` is itself a direct dependency of the live Perfect-Lasso e-commerce site. This package is not a standalone demo — it sits transitively in the request path of production traffic.
+This is real, active, load-bearing infrastructure: `Perfect-FileMaker` imports `PerfectXML` (in 3 source files) to parse the FileMaker XML Data API, and `Perfect-FileMaker` is itself a direct dependency of Perfect-Lasso — a Swift reimplementation of the Lasso language, still in active development and not yet production-ready, but validated against real code from multiple production e-commerce sites. This package is not a standalone demo — it sits transitively in the request path of that validation work.
 
 It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and Codable integration for decoding XML directly into model types (see [Additional APIs](#additional-apis) below).
 
