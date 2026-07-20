@@ -1,55 +1,43 @@
 # Perfect-XML
 
 <p align="center">
-    <a href="http://perfect.org/get-involved.html" target="_blank">
-        <img src="http://perfect.org/assets/github/perfect_github_2_0_0.jpg" alt="Get Involed with Perfect!" width="854" />
-    </a>
-</p>
-
-<p align="center">
-    <a href="https://github.com/PerfectlySoft/Perfect" target="_blank">
-        <img src="http://www.perfect.org/github/Perfect_GH_button_1_Star.jpg" alt="Star Perfect On Github" />
-    </a>  
-    <a href="http://stackoverflow.com/questions/tagged/perfect" target="_blank">
-        <img src="http://www.perfect.org/github/perfect_gh_button_2_SO.jpg" alt="Stack Overflow" />
-    </a>  
-    <a href="https://twitter.com/perfectlysoft" target="_blank">
-        <img src="http://www.perfect.org/github/Perfect_GH_button_3_twit.jpg" alt="Follow Perfect on Twitter" />
-    </a>  
-    <a href="http://perfect.ly" target="_blank">
-        <img src="http://www.perfect.org/github/Perfect_GH_button_4_slack.jpg" alt="Join the Perfect Slack" />
-    </a>
-</p>
-
-<p align="center">
     <a href="https://developer.apple.com/swift/" target="_blank">
-        <img src="https://img.shields.io/badge/Swift-4.0-orange.svg?style=flat" alt="Swift 4.0">
+        <img src="https://img.shields.io/badge/Swift-6.2-orange.svg?style=flat" alt="Swift 6.2">
     </a>
     <a href="https://developer.apple.com/swift/" target="_blank">
-        <img src="https://img.shields.io/badge/Platforms-OS%20X%20%7C%20Linux%20-lightgray.svg?style=flat" alt="Platforms OS X | Linux">
+        <img src="https://img.shields.io/badge/Platforms-macOS%2026%2B-lightgray.svg?style=flat" alt="Platforms macOS 26+">
     </a>
-    <a href="http://perfect.org/licensing.html" target="_blank">
-        <img src="https://img.shields.io/badge/License-Apache-lightgrey.svg?style=flat" alt="License Apache">
-    </a>
-    <a href="http://twitter.com/PerfectlySoft" target="_blank">
-        <img src="https://img.shields.io/badge/Twitter-@PerfectlySoft-blue.svg?style=flat" alt="PerfectlySoft Twitter">
-    </a>
-    <a href="http://perfect.ly" target="_blank">
-        <img src="http://perfect.ly/badge.svg" alt="Slack Status">
+    <a href="./LICENSE" target="_blank">
+        <img src="https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg?style=flat" alt="License Apache 2.0">
     </a>
 </p>
 
+XML &amp; HTML parsing support for [Perfect-Resurrection](https://github.com/taplin), a maintained fork/resurrection of the original PerfectlySoft [Perfect-XML](https://github.com/PerfectlySoft/Perfect-XML) library.
 
-XML &amp; HTML parsing support for Perfect
+This is real, active, load-bearing infrastructure: `Perfect-FileMaker` imports `PerfectXML` (in 3 source files) to parse the FileMaker XML Data API, and `Perfect-FileMaker` is itself a direct dependency of the live Perfect-Lasso e-commerce site. This package is not a standalone demo — it sits transitively in the request path of production traffic.
 
-It currently contains most of the DOM Core level 2 *read-only* APIs and includes XPath support.
+It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and Codable integration for decoding XML directly into model types (see [Additional APIs](#additional-apis) below).
+
+**Requirements:** Swift tools version 6.2, macOS 26+ (`platforms: [.macOS(.v26)]` in `Package.swift`). No formal Linux platform entry is declared in `Package.swift`, but the underlying `libxml2` systemLibrary target ships an `.apt(["libxml2-dev"])` provider for Linux builds.
+
+**Concurrency:** this is a synchronous, non-async/await library. Every public class (document/node/parser types) is `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment, as part of the Swift 6.2 strict-concurrency modernization.
+
+**Security:** as of the `3ebe231` "Modernize to Swift 6" commit, DOM parsing passes `XML_PARSE_NONET` to defend against XXE / external-entity / DTD-based injection, and a previously mis-flagged hardening bug in the streaming reader (a wrong C enum value that was silently *allowing* DTD loading) was corrected. If you're evaluating this package as a parsing trust boundary, that commit is the one to read.
 
 ## Building
 
-Add this project as a dependency in your Package.swift file.
+`Perfect-XML` has zero external Swift package dependencies — the only dependency is a local `libxml2` `.systemLibrary` target (`pkgConfig: "libxml-2.0"`) inlined directly into this repo's `Package.swift`, which replaces what used to be a separate `Perfect-libxml2` package. System `libxml2` (via `brew`/`apt`) is still required at build time; see the platform notes below.
 
+Within the Perfect-Resurrection monorepo, consume this as a local path dependency in the consuming package's `Package.swift`:
+
+```swift
+.package(path: "../Perfect-XML")
 ```
-.Package(url:"https://github.com/PerfectlySoft/Perfect-XML.git", majorVersion: 3)
+
+If depending on it directly from this fork over git:
+
+```swift
+.package(url: "https://github.com/taplin/Perfect-XML.git", from: "1.0.0")
 ```
 
 ## macOS Build Notes
@@ -530,3 +518,23 @@ for node in set {
 	XCTAssert(e.prefix == "foo")
 }
 ```
+
+## Additional APIs
+
+Beyond the DOM + XPath surface documented above, `Sources/PerfectXML` also includes:
+
+- **SAX push-parser** (`SAX.swift`) — event-driven parsing for large documents where building a full DOM tree isn't desirable.
+- **Streaming reader** (`XMLStream.swift`) — an incremental/streaming XML reader.
+- **Codable integration** (`Codable.swift`) — an `XMLEncoder`/decoding bridge for decoding XML directly into `Codable` model types.
+
+These aren't yet covered by worked examples in this README; see the source files and `Tests/PerfectXMLTests/PerfectXMLTests.swift` for usage.
+
+## Testing
+
+Run the test suite with:
+
+```
+swift test
+```
+
+See `Tests/PerfectXMLTests/PerfectXMLTests.swift` for the full suite, including the DOM/XPath examples shown throughout this README.
