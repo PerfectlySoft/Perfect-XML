@@ -50,11 +50,12 @@ extension String {
 		// conversion here would trap at runtime for any byte >= 0x80
 		// (every UTF-8 continuation byte), so this initializer could
 		// never have correctly handled non-ASCII content. Building the
-		// byte array directly as `[UInt8]` and using
-		// `String(validating:as:)` (the non-deprecated replacement for
-		// the old null-terminated-C-string API) fixes both issues.
+		// byte array directly as `[UInt8]` and validating via Foundation's
+		// `String(bytes:encoding:)` (returns nil on invalid UTF-8, same as
+		// the newer `String(validating:as:)`, but with no OS version floor)
+		// fixes both issues.
 		let bytes = (0..<count).map { n[$0] }
-		guard let s = String(validating: bytes, as: UTF8.self) else {
+		guard let s = String(bytes: bytes, encoding: .utf8) else {
 			self = `default`
 			return
 		}

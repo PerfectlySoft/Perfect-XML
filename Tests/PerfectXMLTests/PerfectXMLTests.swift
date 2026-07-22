@@ -563,6 +563,27 @@ import Testing
     #expect(d.closes.isEmpty)
 }
 
+// Regression for the `String(_:count:default:)` UTF-8 decode fix in
+// XMLStream.swift: character data containing multi-byte UTF-8 sequences
+// (continuation bytes >= 0x80) must decode correctly instead of falling
+// back to `default`.
+@Test func saxNonASCIICharacters() throws {
+    final class TestDelegate: SAXDelegate {
+        var collected = ""
+        func characters(_ c: String) { collected += c }
+    }
+    let d = TestDelegate()
+    let sax = SAXParser(delegate: d)
+    let value = "caf\u{e9} \u{4f60}\u{597d} \u{1f600}"
+    let bytes = Array("<A>\(value)</A>".utf8)
+    for n in stride(from: 0, to: bytes.count, by: 3) {
+        let upper = min(n + 3, bytes.count)
+        try sax.pushData(Array(bytes[n..<upper]))
+    }
+    try sax.finish()
+    #expect(d.collected == value)
+}
+
 // MARK: - XXE hardening regression (see XMLDOM.swift's doc comments on
 // XDocument.init?(fromSource:)/HTMLDocument.init?(fromSource:encoding:))
 //
