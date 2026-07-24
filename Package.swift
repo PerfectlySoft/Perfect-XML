@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "PerfectXML",
     platforms: [
-        .macOS(.v14),
+        .macOS(.v12),
     ],
     products: [
         .library(name: "PerfectXML", targets: ["PerfectXML"])
