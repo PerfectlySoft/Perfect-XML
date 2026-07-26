@@ -5,7 +5,7 @@
         <img src="https://img.shields.io/badge/Swift-6.2-orange.svg?style=flat" alt="Swift 6.2">
     </a>
     <a href="https://developer.apple.com/swift/" target="_blank">
-        <img src="https://img.shields.io/badge/Platforms-macOS%2026%2B-lightgray.svg?style=flat" alt="Platforms macOS 26+">
+        <img src="https://img.shields.io/badge/Platforms-macOS%2012%2B-lightgray.svg?style=flat" alt="Platforms macOS 12+">
     </a>
     <a href="./LICENSE" target="_blank">
         <img src="https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg?style=flat" alt="License Apache 2.0">
@@ -18,7 +18,7 @@ This is real, active, load-bearing infrastructure: `Perfect-FileMaker` imports `
 
 It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and Codable integration for decoding XML directly into model types (see [Additional APIs](#additional-apis) below).
 
-**Requirements:** Swift tools version 6.2, macOS 26+ (`platforms: [.macOS(.v26)]` in `Package.swift`). No formal Linux platform entry is declared in `Package.swift`, but the underlying `libxml2` systemLibrary target ships an `.apt(["libxml2-dev"])` provider for Linux builds.
+**Requirements:** Swift tools version 6.2, macOS 12+ (`platforms: [.macOS(.v12)]` in `Package.swift`). No formal Linux platform entry is declared in `Package.swift`, but the underlying `libxml2` systemLibrary target ships an `.apt(["libxml2-dev"])` provider for Linux builds.
 
 **Concurrency:** this is a synchronous, non-async/await library. Every public class (document/node/parser types) is `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment, as part of the Swift 6.2 strict-concurrency modernization.
 
@@ -28,16 +28,10 @@ It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, 
 
 `Perfect-XML` has zero external Swift package dependencies — the only dependency is a local `libxml2` `.systemLibrary` target (`pkgConfig: "libxml-2.0"`) inlined directly into this repo's `Package.swift`, which replaces what used to be a separate `Perfect-libxml2` package. System `libxml2` (via `brew`/`apt`) is still required at build time; see the platform notes below.
 
-Within the Perfect-Resurrection monorepo, consume this as a local path dependency in the consuming package's `Package.swift`:
+Depend on this fork over git — no tagged releases exist yet, so pin a branch rather than a version:
 
 ```swift
-.package(path: "../Perfect-XML")
-```
-
-If depending on it directly from this fork over git:
-
-```swift
-.package(url: "https://github.com/taplin/Perfect-XML.git", from: "1.0.0")
+.package(url: "https://github.com/taplin/Perfect-XML.git", branch: "main")
 ```
 
 ## macOS Build Notes
