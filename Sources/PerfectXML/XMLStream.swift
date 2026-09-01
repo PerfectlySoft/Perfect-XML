@@ -25,7 +25,7 @@ extension String {
 		guard let n = p else {
 			return nil
 		}
-		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, { String(validatingUTF8: $0) }) else {
+		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, { String(validatingCString: $0) }) else {
 			return nil
 		}
 		self = s
@@ -35,7 +35,7 @@ extension String {
 			self = `default`
 			return
 		}
-		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, { String(validatingUTF8: $0) }) else {
+		guard let s = n.withMemoryRebound(to: Int8.self, capacity: 0, { String(validatingCString: $0) }) else {
 			self = `default`
 			return
 		}
@@ -46,8 +46,16 @@ extension String {
 			self = `default`
 			return
 		}
-		let a = (0..<count).map { Int8(n[$0]) } + [0]
-		guard let s = String(validatingUTF8: a) else {
+		// `xmlChar` is already `UInt8` — the previous `Int8(n[$0])`
+		// conversion here would trap at runtime for any byte >= 0x80
+		// (every UTF-8 continuation byte), so this initializer could
+		// never have correctly handled non-ASCII content. Building the
+		// byte array directly as `[UInt8]` and validating via Foundation's
+		// `String(bytes:encoding:)` (returns nil on invalid UTF-8, same as
+		// the newer `String(validating:as:)`, but with no OS version floor)
+		// fixes both issues.
+		let bytes = (0..<count).map { n[$0] }
+		guard let s = String(bytes: bytes, encoding: .utf8) else {
 			self = `default`
 			return
 		}
@@ -73,7 +81,12 @@ func fromContext<A: AnyObject>(_ type: A.Type, _ context: UnsafeMutableRawPointe
 
 //xmlTextReaderGetParserColumnNumber
 
-public class XMLStream {
+/// `@unchecked Sendable`: wraps a raw libxml2 streaming-reader context with
+/// no internal synchronization. See `XNode`'s doc comment (`XMLDOM.swift`)
+/// for this package's general thread-confinement contract — the same
+/// applies here: drive one `XMLStream` instance's `next`/`nextSibling`
+/// calls from a single task.
+public class XMLStream: @unchecked Sendable {
 	public enum NodeType: Int {
 		case none = 0, element, attribute, text, cdata, entityReference,
 			entity, processingInstruction, comment, document, documentType, fragment,
@@ -110,8 +123,10 @@ public class XMLStream {
 				guard let data = try me.dataProvider.getData(maxCount: Int(bufferSize)) else {
 					return 0
 				}
-				_ = data.withUnsafeBytes {
-					memcpy(buffer, $0, data.count)
+				data.withUnsafeBytes { (rawBuffer: UnsafeRawBufferPointer) in
+					if let base = rawBuffer.baseAddress {
+						memcpy(buffer, base, data.count)
+					}
 				}
 				return Int32(data.count)
 			} catch {
@@ -127,12 +142,24 @@ public class XMLStream {
 			me.dataProvider.close()
 			return 0
 		}
+		// Options bitmask must only contain real xmlParserOption values.
+		// A previous version of this code also OR'd in
+		// XML_PARSER_SUBST_ENTITIES — that constant belongs to the
+		// unrelated xmlParserProperties enum (for
+		// xmlTextReaderSetParserProp), and its raw value (4) collides
+		// with XML_PARSE_DTDLOAD in the actual xmlParserOption enum —
+		// i.e. it was accidentally enabling external DTD loading, not
+		// hardening anything. XML_PARSE_NONET blocks network-based
+		// external entity/DTD resolution (the classic XXE/SSRF vector);
+		// entity substitution (XML_PARSE_NOENT) is deliberately left at
+		// its default-off behavior to avoid billion-laughs-style
+		// expansion DoS.
 		guard let reader = xmlReaderForIO(readCallback,
 										  closeCallback,
 										  asContext(self),
 										  "/",
 										  "utf8",
-										  Int32(XML_PARSE_NONET.rawValue | XML_PARSE_NOCDATA.rawValue | XML_PARSER_SUBST_ENTITIES.rawValue)) else {
+										  Int32(XML_PARSE_NONET.rawValue | XML_PARSE_NOCDATA.rawValue)) else {
 											throw XMLStreamError("Unable to allocate XML reader.")
 		}
 		readerPtr = reader
@@ -192,10 +219,10 @@ public extension XMLStream.NodeDescriptor {
 			return nil
 		}
 		defer {
-			xmlFree(n)
+			libxmlFree(n)
 		}
 		return n.withMemoryRebound(to: Int8.self, capacity: 0) {
-			return String(validatingUTF8: $0)
+			return String(validatingCString: $0)
 		}
 	}
 	var isEmpty: Bool {

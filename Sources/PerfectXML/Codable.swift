@@ -7,8 +7,107 @@
 
 import Foundation
 
-func die() -> Never {
-	fatalError("Unimplemented")
+/// `XMLEncoder` only implements a flat keyed container of primitive
+/// values — unkeyed (array) containers, single-value containers, and any
+/// nested `Encodable` value are deliberately unimplemented pending real
+/// usage evidence (nothing in this codebase's consumers needs more than
+/// flat structs). `Encoder`/`KeyedEncodingContainerProtocol`'s
+/// container-vending methods aren't declared `throws`, so there's no way
+/// to fail immediately when one of those unsupported containers is
+/// requested — instead they return one of these "poisoned" stand-ins,
+/// and the *first actual attempt* to encode a value into it throws
+/// `XMLEncoderError` (a real library should never `fatalError()` on
+/// ordinary unsupported input from calling code).
+private let unsupportedShapeMessage =
+	"XMLEncoder does not support unkeyed/single-value/nested containers — only a flat keyed container of primitive values is implemented."
+
+struct UnsupportedEncodingContainer: UnkeyedEncodingContainer, SingleValueEncodingContainer {
+	let codingPath: [CodingKey]
+	var count: Int { 0 }
+
+	private func fail() throws {
+		throw XMLEncoderError(unsupportedShapeMessage)
+	}
+
+	mutating func encodeNil() throws { try fail() }
+	mutating func encode(_ value: Bool) throws { try fail() }
+	mutating func encode(_ value: String) throws { try fail() }
+	mutating func encode(_ value: Double) throws { try fail() }
+	mutating func encode(_ value: Float) throws { try fail() }
+	mutating func encode(_ value: Int) throws { try fail() }
+	mutating func encode(_ value: Int8) throws { try fail() }
+	mutating func encode(_ value: Int16) throws { try fail() }
+	mutating func encode(_ value: Int32) throws { try fail() }
+	mutating func encode(_ value: Int64) throws { try fail() }
+	mutating func encode(_ value: UInt) throws { try fail() }
+	mutating func encode(_ value: UInt8) throws { try fail() }
+	mutating func encode(_ value: UInt16) throws { try fail() }
+	mutating func encode(_ value: UInt32) throws { try fail() }
+	mutating func encode(_ value: UInt64) throws { try fail() }
+	mutating func encode<T>(_ value: T) throws where T: Encodable { try fail() }
+
+	mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
+		KeyedEncodingContainer(UnsupportedKeyedEncodingContainer<NestedKey>(codingPath: codingPath))
+	}
+	mutating func nestedUnkeyedContainer() -> UnkeyedEncodingContainer {
+		UnsupportedEncodingContainer(codingPath: codingPath)
+	}
+	mutating func superEncoder() -> Encoder {
+		UnsupportedEncoder(codingPath: codingPath)
+	}
+}
+
+struct UnsupportedKeyedEncodingContainer<K: CodingKey>: KeyedEncodingContainerProtocol {
+	let codingPath: [CodingKey]
+
+	private func fail() throws {
+		throw XMLEncoderError(unsupportedShapeMessage)
+	}
+
+	mutating func encodeNil(forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Bool, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: String, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Double, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Float, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Int, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Int8, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Int16, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Int32, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: Int64, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: UInt, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: UInt8, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: UInt16, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: UInt32, forKey key: K) throws { try fail() }
+	mutating func encode(_ value: UInt64, forKey key: K) throws { try fail() }
+	mutating func encode<T>(_ value: T, forKey key: K) throws where T: Encodable { try fail() }
+
+	mutating func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey> where NestedKey: CodingKey {
+		KeyedEncodingContainer(UnsupportedKeyedEncodingContainer<NestedKey>(codingPath: codingPath))
+	}
+	mutating func nestedUnkeyedContainer(forKey key: K) -> UnkeyedEncodingContainer {
+		UnsupportedEncodingContainer(codingPath: codingPath)
+	}
+	mutating func superEncoder() -> Encoder {
+		UnsupportedEncoder(codingPath: codingPath)
+	}
+	mutating func superEncoder(forKey key: K) -> Encoder {
+		UnsupportedEncoder(codingPath: codingPath)
+	}
+}
+
+struct UnsupportedEncoder: Encoder {
+	let codingPath: [CodingKey]
+	let userInfo: [CodingUserInfoKey: Any] = [:]
+
+	func container<Key>(keyedBy type: Key.Type) -> KeyedEncodingContainer<Key> where Key: CodingKey {
+		KeyedEncodingContainer(UnsupportedKeyedEncodingContainer<Key>(codingPath: codingPath))
+	}
+	func unkeyedContainer() -> UnkeyedEncodingContainer {
+		UnsupportedEncodingContainer(codingPath: codingPath)
+	}
+	func singleValueContainer() -> SingleValueEncodingContainer {
+		UnsupportedEncodingContainer(codingPath: codingPath)
+	}
 }
 
 public struct XMLDecoderError: Error {
@@ -79,11 +178,11 @@ public class XMLEncoder: Encoder {
 	}
 	
 	public func unkeyedContainer() -> UnkeyedEncodingContainer {
-		die()
+		UnsupportedEncodingContainer(codingPath: codingPath)
 	}
-	
+
 	public func singleValueContainer() -> SingleValueEncodingContainer {
-		die()
+		UnsupportedEncodingContainer(codingPath: codingPath)
 	}
 }
 
@@ -172,15 +271,15 @@ class XMLEncodingContainer<K : CodingKey>: KeyedEncodingContainerProtocol {
 	}
 	
 	func encode<T>(_ value: T, forKey key: K) throws where T : Encodable {
-		die()
+		throw XMLEncoderError(unsupportedShapeMessage)
 	}
-	
+
 	func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-		die()
+		KeyedEncodingContainer(UnsupportedKeyedEncodingContainer<NestedKey>(codingPath: codingPath))
 	}
-	
+
 	func nestedUnkeyedContainer(forKey key: K) -> UnkeyedEncodingContainer {
-		die()
+		UnsupportedEncodingContainer(codingPath: codingPath)
 	}
 	
 	func superEncoder() -> Encoder {
