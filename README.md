@@ -12,9 +12,8 @@
     </a>
 </p>
 
-XML &amp; HTML parsing support for [Perfect-Resurrection](https://github.com/taplin), a maintained fork/resurrection of the original PerfectlySoft [Perfect-XML](https://github.com/PerfectlySoft/Perfect-XML) library.
-
-This is real, active, load-bearing infrastructure: `Perfect-FileMaker` imports `PerfectXML` (in 3 source files) to parse the FileMaker XML Data API, and `Perfect-FileMaker` is itself a direct dependency of Perfect-Lasso — a Swift reimplementation of the Lasso language, still in active development and not yet production-ready, but validated against real code from multiple production e-commerce sites. This package is not a standalone demo — it sits transitively in the request path of that validation work.
+XML &amp; HTML parsing support, modernized for Swift 6. This is real, load-bearing infrastructure:
+`Perfect-FileMaker` imports `PerfectXML` to parse the FileMaker XML Data API.
 
 It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and Codable integration for decoding XML directly into model types (see [Additional APIs](#additional-apis) below).
 
@@ -22,16 +21,16 @@ It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, 
 
 **Concurrency:** this is a synchronous, non-async/await library. Every public class (document/node/parser types) is `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment, as part of the Swift 6.2 strict-concurrency modernization.
 
-**Security:** as of the `3ebe231` "Modernize to Swift 6" commit, DOM parsing passes `XML_PARSE_NONET` to defend against XXE / external-entity / DTD-based injection, and a previously mis-flagged hardening bug in the streaming reader (a wrong C enum value that was silently *allowing* DTD loading) was corrected. If you're evaluating this package as a parsing trust boundary, that commit is the one to read.
+**Security:** DOM parsing passes `XML_PARSE_NONET` to defend against XXE / external-entity / DTD-based injection. If you're evaluating this package as a parsing trust boundary, that's the relevant flag.
+
+The pre-Swift-6 version of this package is preserved on the [`legacy`](../../tree/legacy) branch.
 
 ## Building
 
 `Perfect-XML` has zero external Swift package dependencies — the only dependency is a local `libxml2` `.systemLibrary` target (`pkgConfig: "libxml-2.0"`) inlined directly into this repo's `Package.swift`, which replaces what used to be a separate `Perfect-libxml2` package. System `libxml2` (via `brew`/`apt`) is still required at build time; see the platform notes below.
 
-Depend on this fork over git — no tagged releases exist yet, so pin a branch rather than a version:
-
 ```swift
-.package(url: "https://github.com/taplin/Perfect-XML.git", branch: "main")
+.package(url: "https://github.com/PerfectlySoft/Perfect-XML.git", branch: "main")
 ```
 
 ## macOS Build Notes
