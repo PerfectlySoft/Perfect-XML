@@ -5,7 +5,7 @@
         <img src="https://img.shields.io/badge/Swift-6.2-orange.svg?style=flat" alt="Swift 6.2">
     </a>
     <a href="https://developer.apple.com/swift/" target="_blank">
-        <img src="https://img.shields.io/badge/Platforms-macOS%2012%2B-lightgray.svg?style=flat" alt="Platforms macOS 12+">
+        <img src="https://img.shields.io/badge/Platforms-macOS%2012%2B%20%7C%20iOS%2015%2B%20%7C%20Linux-lightgray.svg?style=flat" alt="Platforms macOS 12+ | iOS 15+ | Linux">
     </a>
     <a href="./LICENSE" target="_blank">
         <img src="https://img.shields.io/badge/License-Apache%202.0-lightgrey.svg?style=flat" alt="License Apache 2.0">
@@ -13,11 +13,11 @@
 </p>
 
 XML &amp; HTML parsing support, modernized for Swift 6. This is real, load-bearing infrastructure:
-`Perfect-FileMaker` imports `PerfectXML` to parse the FileMaker XML Data API.
+`Perfect-FileMaker` imports `PerfectXML` to parse FileMaker Server's XML Custom Web Publishing responses.
 
-It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and Codable integration for decoding XML directly into model types (see [Additional APIs](#additional-apis) below).
+It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and a minimal `XMLEncoder` that encodes flat `Encodable` structs as XML (see [Additional APIs](#additional-apis) below).
 
-**Requirements:** Swift tools version 6.2, macOS 12+ (`platforms: [.macOS(.v12)]` in `Package.swift`). No formal Linux platform entry is declared in `Package.swift`, but the underlying `libxml2` systemLibrary target ships an `.apt(["libxml2-dev"])` provider for Linux builds.
+**Requirements:** Swift 6.2 or newer (`swift-tools-version: 6.2`); macOS 12+, iOS 15+, or Linux. On macOS and iOS, libxml2 comes from the SDK. On Linux, install `libxml2-dev` and `pkg-config` (see [Linux Build Notes](#linux-build-notes)). CI builds and tests on Linux (Swift 6.2 and 6.4), macOS (Xcode 26.0.1 and 26.6) and the iOS Simulator, with warnings treated as errors.
 
 **Concurrency:** this is a synchronous, non-async/await library. Every public class (document/node/parser types) is `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment, as part of the Swift 6.2 strict-concurrency modernization.
 
@@ -27,32 +27,17 @@ The pre-Swift-6 version of this package is preserved on the [`legacy`](../../tre
 
 ## Building
 
-`Perfect-XML` has zero external Swift package dependencies — the only dependency is a local `libxml2` `.systemLibrary` target (`pkgConfig: "libxml-2.0"`) inlined directly into this repo's `Package.swift`, which replaces what used to be a separate `Perfect-libxml2` package. System `libxml2` (via `brew`/`apt`) is still required at build time; see the platform notes below.
+`Perfect-XML` has no external Swift package dependencies. libxml2 is wrapped by a local `.systemLibrary` target inlined into this repo's `Package.swift`, which replaces the separate `Perfect-libxml2` package that 3.x depended on. The system libxml2 is still required at build time; see the platform notes below.
 
 ```swift
-.package(url: "https://github.com/PerfectlySoft/Perfect-XML.git", branch: "main")
+.package(url: "https://github.com/PerfectlySoft/Perfect-XML.git", from: "4.0.0")
 ```
 
-## macOS Build Notes
+and add `.product(name: "PerfectXML", package: "Perfect-XML")` to your target's dependencies.
 
-If you receive a compile error that says the following, you need to install and link libxml2
+## macOS and iOS Build Notes
 
-```
-note: you may be able to install libxml-2.0 using your system-packager:
-
-    brew install libxml2
-
-Compile Swift Module 'PerfectXML' (2 sources)
-<module-includes>:1:9: note: in file included from <module-includes>:1:
-#import "libxml2.h"
-```
-
-To install and link libxml2 with homebrew, use the following two commands
-
-```
-brew install libxml2
-brew link --force libxml2
-```
+Nothing to install: the macOS and iOS SDKs include libxml2, and the package uses that copy without pkg-config. A Homebrew libxml2 isn't needed. Don't `brew link --force libxml2` for this package: mixing Homebrew's libxml2 headers with the SDK's can fail the build with "conflicting types" errors.
 
 ## Linux Build Notes
 
@@ -518,9 +503,20 @@ Beyond the DOM + XPath surface documented above, `Sources/PerfectXML` also inclu
 
 - **SAX push-parser** (`SAX.swift`) — event-driven parsing for large documents where building a full DOM tree isn't desirable.
 - **Streaming reader** (`XMLStream.swift`) — an incremental/streaming XML reader.
-- **Codable integration** (`Codable.swift`) — an `XMLEncoder`/decoding bridge for decoding XML directly into `Codable` model types.
+- **XML encoding** (`Codable.swift`) — `XMLEncoder().encode(value, rootName:namespace:)` encodes a flat `Encodable` struct of primitive values as an XML document. Nested values and unkeyed or single-value containers aren't supported and throw `XMLEncoderError`. There is no XML decoder.
 
 These aren't yet covered by worked examples in this README; see the source files and `Tests/PerfectXMLTests/PerfectXMLTests.swift` for usage.
+
+## Migrating from 3.x
+
+4.0.0 is a major release; the [release notes](../../releases/tag/4.0.0) list every change. The ones most likely to need attention:
+
+* **Toolchain and platforms.** Swift tools 6.2 is required. The package declares macOS 12+ and iOS 15+ (3.x declared no platforms).
+* **No more `Perfect-libxml2` dependency.** libxml2 is wrapped inside this package. The C module is still named `perfectxml2`. On macOS, the SDK's libxml2 is used; a Homebrew libxml2 is no longer needed.
+* **`Sendable`.** The node, document and parser classes are `@unchecked Sendable`. They have no internal locking: use each document, `SAXParser` or `XMLStream` from one task at a time.
+* **`XNode.ownerDocument` is read-only** (`private(set)`).
+* **Parsing never reaches the network.** `XDocument`, `HTMLDocument` and `XMLStream` parse with `XML_PARSE_NONET`, so libxml2 never fetches external entities or DTDs over the network. `XMLStream` also no longer loads external DTDs (3.x enabled DTD loading by mistake).
+* **`XMLEncoder` throws instead of crashing** when asked to encode an unsupported shape.
 
 ## Testing
 
