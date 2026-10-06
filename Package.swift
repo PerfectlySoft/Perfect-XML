@@ -3,14 +3,15 @@ import PackageDescription
 
 // Inline system library wrapping libxml2 — replaces Perfect-libxml2.
 //
-// No `pkgConfig` on macOS: recent CommandLineTools/Xcode SDKs bundle
+// No `pkgConfig` on Apple platforms: the macOS and iOS SDKs bundle
 // libxml2's headers (and, on some SDK versions, their own libxml-2.0.pc)
 // directly, and Clang finds them via its default system search path with
 // zero extra flags. If a Homebrew libxml2 is *also* on PKG_CONFIG_PATH,
 // asking pkg-config here can resolve to Homebrew's copy instead, mixing
 // its headers with the SDK's in the same module build ("conflicting
-// types" for symbols like __oldXMLWDcompatibility). See
-// Documentation/libxml2-pkgconfig-collision.md.
+// types" for symbols like __oldXMLWDcompatibility). The manifest is
+// evaluated on the build host, so `os(macOS)` also covers iOS builds made
+// on a Mac.
 // Linux has no bundled system copy, so pkg-config + apt stays required there.
 #if os(macOS)
 let libxml2Target: Target = .systemLibrary(name: "libxml2")
@@ -28,6 +29,7 @@ let package = Package(
     name: "PerfectXML",
     platforms: [
         .macOS(.v12),
+        .iOS(.v15),
     ],
     products: [
         .library(name: "PerfectXML", targets: ["PerfectXML"])
