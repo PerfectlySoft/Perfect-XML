@@ -312,24 +312,52 @@ public class XDocument: XNode, @unchecked Sendable {
 	
 	/// Parse the XML source string and create the document, if possible.
 	///
-	/// Uses `xmlReadMemory` with an explicit options bitmask (not the
-	/// flag-less `xmlParseDoc`) — `XML_PARSE_NONET` blocks network-based
-	/// external entity/DTD resolution, the classic XXE/SSRF vector, since
-	/// this may parse third-party/customer-supplied XML. Entity
-	/// substitution (`XML_PARSE_NOENT`) is deliberately left off by
-	/// default to avoid billion-laughs-style expansion DoS.
+	/// External entities (`<!ENTITY x SYSTEM "file:///etc/passwd">`) are
+	/// never loaded or substituted, whatever the process-wide libxml2
+	/// defaults are. libxml2 seeds each parser context's entity
+	/// substitution from a global (`xmlSubstituteEntitiesDefault`), and
+	/// `xmlReadMemory` keeps it: if anything in the process turned that
+	/// global on, `xmlReadMemory` loads `file://` entities even without
+	/// `XML_PARSE_NOENT`. So this builds the context itself and forces
+	/// substitution, `XML_PARSE_NOENT` and external DTD loading off before
+	/// parsing. `XML_PARSE_NONET` is kept as defence in depth against
+	/// network fetches. Leaving substitution off also avoids
+	/// billion-laughs-style expansion.
 	public init?(fromSource: String) {
 		_ = XDocument.initialize
 		let bytes = Array(fromSource.utf8)
 		guard let doc = bytes.withUnsafeBufferPointer({ buffer -> xmlDocPtr? in
 			guard let base = buffer.baseAddress else { return nil }
 			return base.withMemoryRebound(to: Int8.self, capacity: buffer.count) { ptr in
-				xmlReadMemory(ptr, Int32(buffer.count), nil, nil, Int32(XML_PARSE_NONET.rawValue))
+				XDocument.parseWithoutEntitySubstitution(ptr, count: Int32(buffer.count))
 			}
 		}) else {
 			return nil
 		}
 		super.init(toNodePtr(doc), document: nil)
+	}
+
+	/// Parses `count` bytes with entity substitution and external DTD
+	/// loading forced off. Returns nil if the document isn't well formed,
+	/// as `xmlReadMemory` does.
+	static func parseWithoutEntitySubstitution(_ ptr: UnsafePointer<CChar>, count: Int32) -> xmlDocPtr? {
+		guard let ctxt = xmlCreateMemoryParserCtxt(ptr, count) else {
+			return nil
+		}
+		defer { xmlFreeParserCtxt(ctxt) }
+		_ = xmlCtxtUseOptions(ctxt, Int32(XML_PARSE_NONET.rawValue))
+		ctxt.pointee.replaceEntities = 0
+		ctxt.pointee.loadsubset = 0
+		ctxt.pointee.options &= ~Int32(XML_PARSE_NOENT.rawValue | XML_PARSE_DTDLOAD.rawValue
+			| XML_PARSE_DTDATTR.rawValue | XML_PARSE_DTDVALID.rawValue)
+		_ = xmlParseDocument(ctxt)
+		let doc = ctxt.pointee.myDoc
+		ctxt.pointee.myDoc = nil
+		guard ctxt.pointee.wellFormed != 0 else {
+			if let doc { xmlFreeDoc(doc) }
+			return nil
+		}
+		return doc
 	}
 	
 	init(_ ptr: xmlDocPtr) {
@@ -365,10 +393,9 @@ public class XDocument: XNode, @unchecked Sendable {
 public class HTMLDocument: XDocument, @unchecked Sendable {
 	/// Parse the HTML source string and create the document, if possible.
 	///
-	/// Uses `htmlReadMemory` with an explicit options bitmask (not the
-	/// flag-less `htmlParseDoc`) — see `XDocument.init?(fromSource:)`'s
-	/// doc comment for the XXE-hardening rationale, which applies
-	/// identically here.
+	/// Uses `htmlReadMemory` with `XML_PARSE_NONET` (defence in depth).
+	/// The HTML parser doesn't load external entities; there's a test
+	/// for that with the libxml2 substitution global turned on.
 	public init?(fromSource: String, encoding: String = "UTF-8") {
 		_ = XDocument.initialize
 		let bytes = Array(fromSource.utf8)
