@@ -104,8 +104,9 @@ jobs:
           xcrun simctl list devices available
           exit 1
 
-      # The test target builds at the package's iOS 15 deployment target, so this also
-      # catches APIs that need a newer iOS. The package has no dependencies, so treating
+      # The library builds at the package's iOS 15 deployment target, so this also catches
+      # library APIs that need a newer iOS (Xcode may build the test bundle itself at a
+      # later target; Xcode 27 used iOS 17). The package has no dependencies, so treating
       # warnings as errors here doesn't clash with Xcode's warning suppression for packages.
       - name: Test
         run: |

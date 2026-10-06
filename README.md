@@ -19,9 +19,9 @@ It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, 
 
 **Requirements:** Swift 6.2 or newer (`swift-tools-version: 6.2`); macOS 12+, iOS 15+, or Linux. On macOS and iOS, libxml2 comes from the SDK. On Linux, install `libxml2-dev` and `pkg-config` (see [Linux Build Notes](#linux-build-notes)). CI builds and tests on Linux (Swift 6.2 and 6.4), macOS (Xcode 26.0.1 and 26.6) and the iOS Simulator, with warnings treated as errors.
 
-**Concurrency:** this is a synchronous, non-async/await library. Every public class (document/node/parser types) is `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment, as part of the Swift 6.2 strict-concurrency modernization.
+**Concurrency:** this is a synchronous, non-async/await library. The document, node and parser classes (`XDocument`, `HTMLDocument`, the `XNode` subclasses, `SAXParser` and `XMLStream`) are `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment. They have no internal locking, so use each instance from one task at a time. `XMLEncoder` is not `Sendable`; use one per task.
 
-**Security:** DOM parsing passes `XML_PARSE_NONET` to defend against XXE / external-entity / DTD-based injection. If you're evaluating this package as a parsing trust boundary, that's the relevant flag.
+**Security:** external entities (`<!ENTITY x SYSTEM "file:///etc/passwd">`, the classic XXE attack) are never loaded or substituted, and external DTDs aren't loaded. libxml2 takes its entity-substitution default from a process-wide global (`xmlSubstituteEntitiesDefault`), so `XDocument` and `XMLStream` force substitution off on their own parser contexts; another library turning the global on doesn't change that. Parsing also passes `XML_PARSE_NONET` as defence in depth against network fetches. Entity references stay references in the parsed tree rather than being substituted during parsing. Tests cover the `file://` case with the global both off and on.
 
 The pre-Swift-6 version of this package is preserved on the [`legacy`](../../tree/legacy) branch.
 
@@ -503,7 +503,7 @@ Beyond the DOM + XPath surface documented above, `Sources/PerfectXML` also inclu
 
 - **SAX push-parser** (`SAX.swift`) — event-driven parsing for large documents where building a full DOM tree isn't desirable.
 - **Streaming reader** (`XMLStream.swift`) — an incremental/streaming XML reader.
-- **XML encoding** (`Codable.swift`) — `XMLEncoder().encode(value, rootName:namespace:)` encodes a flat `Encodable` struct of primitive values as an XML document. Nested values and unkeyed or single-value containers aren't supported and throw `XMLEncoderError`. There is no XML decoder.
+- **XML encoding** (`Codable.swift`) — `XMLEncoder().encode(value, rootName:namespace:)` encodes a flat `Encodable` struct of primitive values as an XML document, one child element per property. A `namespace:` becomes the root's default namespace (`<root xmlns="…">`). Nested values, arrays (including an empty top-level array) and single values aren't supported and throw `XMLEncoderError`. There is no XML decoder.
 
 These aren't yet covered by worked examples in this README; see the source files and `Tests/PerfectXMLTests/PerfectXMLTests.swift` for usage.
 
@@ -515,8 +515,9 @@ These aren't yet covered by worked examples in this README; see the source files
 * **No more `Perfect-libxml2` dependency.** libxml2 is wrapped inside this package. The C module is still named `perfectxml2`. On macOS, the SDK's libxml2 is used; a Homebrew libxml2 is no longer needed.
 * **`Sendable`.** The node, document and parser classes are `@unchecked Sendable`. They have no internal locking: use each document, `SAXParser` or `XMLStream` from one task at a time.
 * **`XNode.ownerDocument` is read-only** (`private(set)`).
-* **Parsing never reaches the network.** `XDocument`, `HTMLDocument` and `XMLStream` parse with `XML_PARSE_NONET`, so libxml2 never fetches external entities or DTDs over the network. `XMLStream` also no longer loads external DTDs (3.x enabled DTD loading by mistake).
-* **`XMLEncoder` throws instead of crashing** when asked to encode an unsupported shape.
+* **`XMLStream` no longer loads external DTDs.** 3.x enabled DTD loading by mistake.
+* **External entities stay unloaded even if the libxml2 global says otherwise.** `XDocument` and `XMLStream` force entity substitution off, so even in a process that called `xmlSubstituteEntitiesDefault(1)`, `file://` entity contents don't appear in `nodeValue`. 3.x's `xmlParseDoc` honoured the global.
+* **`XMLEncoder`.** It throws instead of crashing on an unsupported shape, and also throws for a top-level array (an empty one used to encode as `<root/>`). `namespace:` now writes `<root xmlns="…">`; 3.x wrote the malformed `<root:namespace>…</root>`. `XMLDecoderError`, which nothing threw, is removed.
 
 ## Testing
 

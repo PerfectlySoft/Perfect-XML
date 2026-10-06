@@ -21,6 +21,7 @@ let libxml2Target: Target = .systemLibrary(
     pkgConfig: "libxml-2.0",
     providers: [
         .apt(["libxml2-dev"]),
+        .yum(["libxml2-devel"]),
     ]
 )
 #endif
