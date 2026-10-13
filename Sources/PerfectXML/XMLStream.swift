@@ -151,8 +151,8 @@ public class XMLStream: @unchecked Sendable {
 		// i.e. it was accidentally enabling external DTD loading, not
 		// hardening anything. XML_PARSE_NONET is defence in depth against
 		// network fetches. What keeps external entities out is entity
-		// substitution being off. libxml2 seeds that from a process global
-		// (xmlSubstituteEntitiesDefault); the reader didn't load entities in
+		// substitution being off. libxml2 seeds that from a libxml2 global
+		// (xmlSubstituteEntitiesDefault; per-thread in threaded builds); the reader didn't load entities in
 		// testing with the global on, but substitution and external DTD
 		// loading are forced off below anyway, as XDocument does.
 		guard let reader = xmlReaderForIO(readCallback,

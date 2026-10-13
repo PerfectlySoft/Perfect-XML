@@ -21,7 +21,7 @@ It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, 
 
 **Concurrency:** this is a synchronous, non-async/await library. The document, node and parser classes (`XDocument`, `HTMLDocument`, the `XNode` subclasses, `SAXParser` and `XMLStream`) are `@unchecked Sendable` over an underlying libxml2 pointer, each with an explicit rationale comment. They have no internal locking, so use each instance from one task at a time. `XMLEncoder` is not `Sendable`; use one per task.
 
-**Security:** external entities (`<!ENTITY x SYSTEM "file:///etc/passwd">`, the classic XXE attack) are never loaded or substituted, and external DTDs aren't loaded. libxml2 takes its entity-substitution default from a process-wide global (`xmlSubstituteEntitiesDefault`), so `XDocument` and `XMLStream` force substitution off on their own parser contexts; another library turning the global on doesn't change that. Parsing also passes `XML_PARSE_NONET` as defence in depth against network fetches. Entity references stay references in the parsed tree rather than being substituted during parsing. Tests cover the `file://` case with the global both off and on.
+**Security:** external entities (`<!ENTITY x SYSTEM "file:///etc/passwd">`, the classic XXE attack) are never loaded or substituted, and external DTDs aren't loaded. libxml2 takes its entity-substitution default from a libxml2 global (`xmlSubstituteEntitiesDefault`; per-thread in threaded builds), so `XDocument` and `XMLStream` force substitution off on their own parser contexts; other code turning the global on, on whatever thread a task runs, doesn't change that. Parsing also passes `XML_PARSE_NONET` as defence in depth against network fetches. Entity references stay references in the parsed tree rather than being substituted during parsing. Tests cover the `file://` case with the global both off and on.
 
 The pre-Swift-6 version of this package is preserved on the [`legacy`](../../tree/legacy) branch.
 
@@ -516,7 +516,7 @@ These aren't yet covered by worked examples in this README; see the source files
 * **`Sendable`.** The node, document and parser classes are `@unchecked Sendable`. They have no internal locking: use each document, `SAXParser` or `XMLStream` from one task at a time.
 * **`XNode.ownerDocument` is read-only** (`private(set)`).
 * **`XMLStream` no longer loads external DTDs.** 3.x enabled DTD loading by mistake.
-* **External entities stay unloaded even if the libxml2 global says otherwise.** `XDocument` and `XMLStream` force entity substitution off, so even in a process that called `xmlSubstituteEntitiesDefault(1)`, `file://` entity contents don't appear in `nodeValue`. 3.x's `xmlParseDoc` honoured the global.
+* **External entities stay unloaded even if the libxml2 global says otherwise.** `XDocument` and `XMLStream` force entity substitution off, so even on a thread where something called `xmlSubstituteEntitiesDefault(1)`, `file://` entity contents don't appear in `nodeValue`. 3.x's `xmlParseDoc` honoured the global.
 * **`XMLEncoder`.** It throws instead of crashing on an unsupported shape, and also throws for a top-level array (an empty one used to encode as `<root/>`). `namespace:` now writes `<root xmlns="…">`; 3.x wrote the malformed `<root:namespace>…</root>`. `XMLDecoderError`, which nothing threw, is removed.
 
 ## Testing

@@ -681,7 +681,9 @@ private func parsedText(_ source: String) throws -> String {
     }
 }
 
-// libxml2 seeds entity substitution from a process-wide global. Plain
+// libxml2 seeds entity substitution from a libxml2 global (per-thread in
+// threaded builds, so this test sets and restores it on its own thread,
+// and the parse runs synchronously on that thread). Plain
 // `xmlReadMemory` (what 4.0 development builds used) returned the file's
 // contents through `nodeValue` once the global was on; the parsers must
 // force substitution off themselves.

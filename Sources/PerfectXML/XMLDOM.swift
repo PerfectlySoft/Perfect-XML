@@ -313,11 +313,11 @@ public class XDocument: XNode, @unchecked Sendable {
 	/// Parse the XML source string and create the document, if possible.
 	///
 	/// External entities (`<!ENTITY x SYSTEM "file:///etc/passwd">`) are
-	/// never loaded or substituted, whatever the process-wide libxml2
-	/// defaults are. libxml2 seeds each parser context's entity
-	/// substitution from a global (`xmlSubstituteEntitiesDefault`), and
-	/// `xmlReadMemory` keeps it: if anything in the process turned that
-	/// global on, `xmlReadMemory` loads `file://` entities even without
+	/// never loaded or substituted, whatever libxml2's global defaults
+	/// are. libxml2 seeds each parser context's entity substitution from
+	/// a libxml2 global (`xmlSubstituteEntitiesDefault`; per-thread in
+	/// threaded builds), and `xmlReadMemory` keeps it: if anything turned
+	/// that global on for the thread a task happens to run on, `xmlReadMemory` loads `file://` entities even without
 	/// `XML_PARSE_NOENT`. So this builds the context itself and forces
 	/// substitution, `XML_PARSE_NOENT` and external DTD loading off before
 	/// parsing. `XML_PARSE_NONET` is kept as defence in depth against
