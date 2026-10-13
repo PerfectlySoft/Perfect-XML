@@ -110,13 +110,6 @@ struct UnsupportedEncoder: Encoder {
 	}
 }
 
-public struct XMLDecoderError: Error {
-	public let msg: String
-	public init(_ m: String) {
-		msg = m
-	}
-}
-
 public struct XMLEncoderError: Error {
 	public let msg: String
 	public init(_ m: String) {
@@ -138,10 +131,19 @@ struct XMLCodingKey: CodingKey {
 	}
 }
 
+/// Encodes a flat `Encodable` struct of primitive values as an XML
+/// document: one child element per property, inside a root element.
+///
+/// Not `Sendable`: an encoder holds its output while encoding, so use one
+/// instance per task (or a new one per call).
 public class XMLEncoder: Encoder {
 	public let codingPath: [CodingKey]
 	public let userInfo: [CodingUserInfoKey : Any]
 	var encoded: String = ""
+	/// Set when an unsupported container is vended. Encoding something
+	/// into one throws, but an empty one (a top-level empty array, say)
+	/// is never written to, so `encode` checks this afterwards.
+	var vendedUnsupportedContainer = false
 	
 	init(rootName: String, codingPath cp: [CodingKey] = []) {
 		codingPath = cp + [XMLCodingKey(rootName)]
@@ -153,19 +155,30 @@ public class XMLEncoder: Encoder {
 		userInfo = [:]
 	}
 	
+	/// Encodes `value` as `<rootName>…</rootName>`. If `namespace` is
+	/// given, it becomes the default namespace of the root element and
+	/// its children (`<rootName xmlns="namespace">`).
+	///
+	/// Throws `XMLEncoderError` for anything but a flat keyed container of
+	/// primitive values, including top-level arrays (even empty ones),
+	/// single values and nested `Encodable` properties.
 	public func encode<A: Encodable>(_ value: A, rootName: String, namespace: String? = nil) throws -> Data {
 		encoded = ""
+		vendedUnsupportedContainer = false
 		try value.encode(to: self)
-		let namePrefix: String
+		guard !vendedUnsupportedContainer else {
+			throw XMLEncoderError(unsupportedShapeMessage)
+		}
+		let namespaceAttribute: String
 		if let ns = namespace {
-			namePrefix = ":\(ns)"
+			namespaceAttribute = " xmlns=\"\(escapeAttributeValue(ns))\""
 		} else {
-			namePrefix = ""
+			namespaceAttribute = ""
 		}
 		if encoded.isEmpty {
-			encoded = "<\(rootName)\(namePrefix)/>"
+			encoded = "<\(rootName)\(namespaceAttribute)/>"
 		} else {
-			encoded = "<\(rootName)\(namePrefix)>\(encoded)</\(rootName)>"
+			encoded = "<\(rootName)\(namespaceAttribute)>\(encoded)</\(rootName)>"
 		}
 		guard let data = encoded.data(using: .utf8) else {
 			throw XMLEncoderError("Invalid encoding was generated.")
@@ -178,12 +191,20 @@ public class XMLEncoder: Encoder {
 	}
 	
 	public func unkeyedContainer() -> UnkeyedEncodingContainer {
-		UnsupportedEncodingContainer(codingPath: codingPath)
+		vendedUnsupportedContainer = true
+		return UnsupportedEncodingContainer(codingPath: codingPath)
 	}
 
 	public func singleValueContainer() -> SingleValueEncodingContainer {
-		UnsupportedEncodingContainer(codingPath: codingPath)
+		vendedUnsupportedContainer = true
+		return UnsupportedEncodingContainer(codingPath: codingPath)
 	}
+}
+
+private func escapeAttributeValue(_ s: String) -> String {
+	s.replacingOccurrences(of: "&", with: "&amp;")
+		.replacingOccurrences(of: "<", with: "&lt;")
+		.replacingOccurrences(of: "\"", with: "&quot;")
 }
 
 class XMLEncodingContainer<K : CodingKey>: KeyedEncodingContainerProtocol {
@@ -275,11 +296,13 @@ class XMLEncodingContainer<K : CodingKey>: KeyedEncodingContainerProtocol {
 	}
 
 	func nestedContainer<NestedKey>(keyedBy keyType: NestedKey.Type, forKey key: K) -> KeyedEncodingContainer<NestedKey> where NestedKey : CodingKey {
-		KeyedEncodingContainer(UnsupportedKeyedEncodingContainer<NestedKey>(codingPath: codingPath))
+		parent.vendedUnsupportedContainer = true
+		return KeyedEncodingContainer(UnsupportedKeyedEncodingContainer<NestedKey>(codingPath: codingPath))
 	}
 
 	func nestedUnkeyedContainer(forKey key: K) -> UnkeyedEncodingContainer {
-		UnsupportedEncodingContainer(codingPath: codingPath)
+		parent.vendedUnsupportedContainer = true
+		return UnsupportedEncodingContainer(codingPath: codingPath)
 	}
 	
 	func superEncoder() -> Encoder {

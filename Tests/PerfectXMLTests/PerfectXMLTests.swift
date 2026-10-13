@@ -1,6 +1,7 @@
 import Foundation
 import Testing
 @testable import PerfectXML
+import perfectxml2
 
 @Test func docParse1() {
     let docSrc = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<a><b><c a=\"attr1\">HI</c><d/></b></a>\n"
@@ -483,9 +484,46 @@ import Testing
     }
 }
 
-// `XMLEncoder` only supports a flat keyed container of primitive values
-// (see Codable.swift's doc comment) — no test for the array/nested case
-// here, matching that deliberate, documented scope limit.
+// MARK: - XMLEncoder (a flat keyed container of primitive values only)
+
+private struct FlatModel: Encodable {
+    let name: String
+    let count: Int
+    let ratio: Double
+    let flag: Bool
+}
+
+@Test func xmlEncoderEncodesFlatStruct() throws {
+    let data = try XMLEncoder().encode(FlatModel(name: "a<b & c", count: 3, ratio: 1.5, flag: true), rootName: "model")
+    let xml = try #require(String(data: data, encoding: .utf8))
+    #expect(xml == "<model><name>a&lt;b &amp; c</name><count>3</count><ratio>1.5</ratio><flag>true</flag></model>")
+    let doc = try #require(XDocument(fromSource: xml))
+    #expect(doc.documentElement?.getElementsByTagName("name").first?.nodeValue == "a<b & c")
+}
+
+@Test func xmlEncoderNamespaceIsADefaultNamespaceDeclaration() throws {
+    let data = try XMLEncoder().encode(FlatModel(name: "n", count: 1, ratio: 0, flag: false), rootName: "model", namespace: "urn:example")
+    let xml = try #require(String(data: data, encoding: .utf8))
+    #expect(xml.hasPrefix("<model xmlns=\"urn:example\"><name>"))
+    let doc = try #require(XDocument(fromSource: xml))
+    let root = try #require(doc.documentElement)
+    #expect(root.localName == "model")
+    #expect(root.namespaceURI == "urn:example")
+    #expect(root.getElementsByTagNameNS(namespaceURI: "urn:example", localName: "count").first?.nodeValue == "1")
+}
+
+@Test func xmlEncoderThrowsForUnsupportedShapes() {
+    struct Nested: Encodable { let inner: FlatModel }
+    struct WithArray: Encodable { let items: [Int] }
+    struct WithEmptyArray: Encodable { let items: [Int] }
+    #expect(throws: XMLEncoderError.self) { try XMLEncoder().encode(Nested(inner: FlatModel(name: "", count: 0, ratio: 0, flag: false)), rootName: "r") }
+    #expect(throws: XMLEncoderError.self) { try XMLEncoder().encode(WithArray(items: [1]), rootName: "r") }
+    #expect(throws: XMLEncoderError.self) { try XMLEncoder().encode(WithEmptyArray(items: []), rootName: "r") }
+    #expect(throws: XMLEncoderError.self) { try XMLEncoder().encode([1, 2], rootName: "r") }
+    // An empty top-level array used to encode silently as `<r/>`.
+    #expect(throws: XMLEncoderError.self) { try XMLEncoder().encode([Int](), rootName: "r") }
+    #expect(throws: XMLEncoderError.self) { try XMLEncoder().encode(42, rootName: "r") }
+}
 
 @Test func xmlStream() throws {
     struct ChunkyProvider: XMLStreamDataProvider {
@@ -584,33 +622,79 @@ import Testing
     #expect(d.collected == value)
 }
 
-// MARK: - XXE hardening regression (see XMLDOM.swift's doc comments on
-// XDocument.init?(fromSource:)/HTMLDocument.init?(fromSource:encoding:))
+// MARK: - External entities (XXE)
 //
-// Points an external SYSTEM entity/DTD reference at a local fixture file
-// containing a unique marker string, parses through the hardened DOM
-// path, and asserts the marker string is absent from the resulting tree.
-// This is portable across libxml2 versions/builds (some already disable
-// external-entity fetching by default independent of the options
-// bitmask) — asserting "no substitution occurred" is correct either way,
-// unlike asserting on network-fetch behavior, which would pass for the
-// wrong reason in a network-isolated CI container.
+// These point an external SYSTEM entity at a local file holding a unique
+// marker and check the marker never reaches the parsed output. They test
+// that entities aren't loaded at all; `XML_PARSE_NONET` (network fetches)
+// isn't what they exercise.
 
-@Test func xxeExternalEntityIsNotSubstituted() throws {
+private func withEntityFile(_ body: (_ marker: String, _ source: String) throws -> Void) throws {
     let marker = "XXE-MARKER-\(UUID().uuidString)"
     let entityFile = FileManager.default.temporaryDirectory
         .appendingPathComponent("perfectxml-xxe-\(UUID().uuidString).txt")
     try marker.write(to: entityFile, atomically: true, encoding: .utf8)
     defer { try? FileManager.default.removeItem(at: entityFile) }
-
-    let docSrc = """
+    let source = """
     <?xml version="1.0"?>
     <!DOCTYPE root [
       <!ENTITY xxe SYSTEM "file://\(entityFile.path)">
     ]>
     <root>&xxe;</root>
     """
-    let doc = XDocument(fromSource: docSrc)
-    let output = doc?.string(pretty: false) ?? ""
-    #expect(!output.contains(marker))
+    try body(marker, source)
+}
+
+private struct StringProvider: XMLStreamDataProvider {
+    let source: [UInt8]
+    var offset = 0
+    init(_ s: String) { source = Array(s.utf8) }
+    mutating func getData(maxCount: Int) throws -> Data? {
+        guard offset < source.count else { return nil }
+        let end = min(source.count, offset + maxCount)
+        defer { offset = end }
+        return Data(source[offset..<end])
+    }
+    func close() {}
+}
+
+/// Everything the parsers expose for `source`, concatenated.
+private func parsedText(_ source: String) throws -> String {
+    var out = ""
+    let doc = XDocument(fromSource: source)
+    out += doc?.string(pretty: false) ?? ""
+    out += doc?.documentElement?.nodeValue ?? ""
+    let stream = XMLStream(provider: StringProvider(source))
+    while let node = try stream.next() {
+        out += node.value ?? ""
+        out += node.content ?? ""
+    }
+    return out
+}
+
+@Test func externalEntityIsNotLoaded() throws {
+    try withEntityFile { marker, source in
+        let doc = XDocument(fromSource: source)
+        #expect(doc != nil)
+        let text = try parsedText(source)
+        #expect(!text.contains(marker))
+    }
+}
+
+// libxml2 seeds entity substitution from a libxml2 global (per-thread in
+// threaded builds, so this test sets and restores it on its own thread,
+// and the parse runs synchronously on that thread). Plain
+// `xmlReadMemory` (what 4.0 development builds used) returned the file's
+// contents through `nodeValue` once the global was on; the parsers must
+// force substitution off themselves.
+@Test func externalEntityIsNotLoadedWhenSubstitutionGlobalIsOn() throws {
+    try withEntityFile { marker, source in
+        let previous = xmlSubstituteEntitiesDefault(1)
+        defer { _ = xmlSubstituteEntitiesDefault(previous) }
+        let text = try parsedText(source)
+        #expect(!text.contains(marker))
+        let html = HTMLDocument(fromSource: source)
+        let htmlText = (html?.string(pretty: false) ?? "") + (html?.documentElement?.nodeValue ?? "")
+        #expect(!htmlText.contains(marker))
+    }
 }

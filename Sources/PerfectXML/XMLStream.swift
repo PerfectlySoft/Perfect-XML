@@ -149,11 +149,12 @@ public class XMLStream: @unchecked Sendable {
 		// xmlTextReaderSetParserProp), and its raw value (4) collides
 		// with XML_PARSE_DTDLOAD in the actual xmlParserOption enum —
 		// i.e. it was accidentally enabling external DTD loading, not
-		// hardening anything. XML_PARSE_NONET blocks network-based
-		// external entity/DTD resolution (the classic XXE/SSRF vector);
-		// entity substitution (XML_PARSE_NOENT) is deliberately left at
-		// its default-off behavior to avoid billion-laughs-style
-		// expansion DoS.
+		// hardening anything. XML_PARSE_NONET is defence in depth against
+		// network fetches. What keeps external entities out is entity
+		// substitution being off. libxml2 seeds that from a libxml2 global
+		// (xmlSubstituteEntitiesDefault; per-thread in threaded builds); the reader didn't load entities in
+		// testing with the global on, but substitution and external DTD
+		// loading are forced off below anyway, as XDocument does.
 		guard let reader = xmlReaderForIO(readCallback,
 										  closeCallback,
 										  asContext(self),
@@ -162,6 +163,8 @@ public class XMLStream: @unchecked Sendable {
 										  Int32(XML_PARSE_NONET.rawValue | XML_PARSE_NOCDATA.rawValue)) else {
 											throw XMLStreamError("Unable to allocate XML reader.")
 		}
+		_ = xmlTextReaderSetParserProp(reader, Int32(XML_PARSER_SUBST_ENTITIES.rawValue), 0)
+		_ = xmlTextReaderSetParserProp(reader, Int32(XML_PARSER_LOADDTD.rawValue), 0)
 		readerPtr = reader
 		return reader
 	}
