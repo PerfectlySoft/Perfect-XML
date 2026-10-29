@@ -12,8 +12,8 @@
     </a>
 </p>
 
-XML &amp; HTML parsing support, modernized for Swift 6. This is real, load-bearing infrastructure:
-`Perfect-FileMaker` imports `PerfectXML` to parse FileMaker Server's XML Custom Web Publishing responses.
+XML and HTML parsing for Swift 6, built on libxml2. [Perfect-FileMaker](https://github.com/PerfectlySoft/Perfect-FileMaker)
+uses it to parse FileMaker Server's XML Custom Web Publishing responses.
 
 It implements most of the DOM Core level 2 *read-only* APIs plus XPath support, and also includes a SAX push-parser, a streaming reader (`XMLStream`), and a minimal `XMLEncoder` that encodes flat `Encodable` structs as XML (see [Additional APIs](#additional-apis) below).
 
